@@ -1,8 +1,7 @@
 from Experiment import *
 
 from GIF import *
-from iGIF_NP import *
-from iGIF_Na import *
+from GIF_Ca import *
 from AEC_Badel import *
 from Tools import *
 
@@ -19,37 +18,21 @@ import json
 import scipy
 from scipy import io
 import cPickle as pkl
-
+import time
 
 
 """
 This script load some experimental data set acquired according to the experimental protocol
-discussed in Pozzorini et al. PLOS Comp. Biol. 2015 and fit three different models:
+discussed in Pozzorini et al. PLOS Comp. Biol. 2015 and fit the GIF-Ca model.
 
-- GIF      : standard GIF as in Pozzorini et al. 2015
-
-- iGIF_NP  : inactivating GIF in which the threshold-voltage coupling is nonparametric
-             (ie, nonlinearity is expanded as a sum of rect functions). This model is the same
-             as the iGIF_NP introduced in Mensi et al. PLOS Comp. Biol. 2016, except for the fact that
-             the spike-triggered adaptation is current-based and not conductance-based.
-
-- iGIF_Na  : inactivating GIF in which the threshold-voltage coupling is modeled using the nonlinear
-             function derived analytically from an HH model in Platkiewicz J and Brette R, PLOS CB 2011.
-             The model is the same as the iGIF_Na introduced in Mensi et al. PLOS Comp. Biol. 2016, except for the fact that
-             the spike-triggered adaptation is current-based and not conductance-based.
-
-These three models are fitted to training set data (as described in Pozzorini et al. 2015 for more info).
 The performance of the models is assessed on a test set (as described in Pozzorini et al. 2015) by computing
 the spike train similarity measure Md*. The test dataset consists of 9 injections of a frozen noise signal
-genrated according to an Ornstein-Uhlenbeck process whose standard deviation was modulated with a sin function.
-
-A similar script (./src/Main_Test_iGIF_FIData.py) is provided that fit the model on the FI data set (as described in Mensi et al. 2016) and test
-it on the same test set used here.
+generated according to an Ornstein-Uhlenbeck process whose standard deviation was modulated with a sin function.
 """
 
 CELL_NAME = 'DRN539_5HT'
-PATH_DATA = '../Data/seventh_set/'+CELL_NAME+'/'
-PATH_RESULTS = '../Results/'+CELL_NAME+'/'
+PATH_DATA = '/Users/alexp/Dropbox/Recherches/Raphe/GIF/Data/seventh_set/'+CELL_NAME+'/'
+PATH_RESULTS = '/Users/alexp/Dropbox/Recherches/Raphe/GIF/Results/'+CELL_NAME+'/'
 SPECIFICATION = ''
 ADDITIONAL_SPECIFIER = ''
 
@@ -69,6 +52,8 @@ experiment.setAECTrace(voltage_traceAEC, 10.**-3, current_traceAEC, 10.**-12, le
 filename_training = PATH_DATA + CELL_NAME +  ADDITIONAL_SPECIFIER + '_training' + SPECIFICATION + '.mat'
 (sampling_time, voltage_trace, current_trace) = load_training_data(filename_training)
 experiment.addTrainingSetTrace(voltage_trace, 10**-3, current_trace, 10**-12, len(voltage_trace)*sampling_time, FILETYPE='Array')
+#Note: once added to experiment, current is converted to nA.
+
 
 # Load test set data
 filename_test = PATH_DATA + CELL_NAME +  ADDITIONAL_SPECIFIER + '_test' + SPECIFICATION + '.mat'
@@ -106,8 +91,8 @@ experiment.setAEC(myAEC)
 experiment.performAEC()
 
 # Plot AEC filters (Kopt and Ke)
-myAEC.plotKopt()
-myAEC.plotKe()
+#myAEC.plotKopt()
+#myAEC.plotKe()
 
 
 ################################################################################
@@ -142,17 +127,15 @@ for i in range(number_of_tests) :
     for j in range(i+1,number_of_tests) :
         Ncoinc += SpikeTrainComparator.Md_dotProduct_Kistler(test_spike_trains[i], test_spike_trains[j], KistlerDotProduct_args, experiment.dt)
 R_X = 2.*Ncoinc/(sum_of_norms*(number_of_tests-1))
-
+print 'Intrinsic reliability = %f' %R_X
 
 
 #################################################################################################
-# STEP 3A: FIT GIF MODEL (Pozzorini et al. 2015)
+# STEP 3: FIT GIF-Ca MODEL
 #################################################################################################
-
-# More details on how to fit a simple GIF model to data can be found here: Main_TestGIF.py
 
 # Create a new object GIF
-GIF_fit = GIF(sampling_time)
+GIF_fit = GIF_Ca(sampling_time)
 
 # Define parameters
 GIF_fit.Tref = 6.0
@@ -169,21 +152,55 @@ GIF_fit.gamma.setMetaParameters(length=2000.0, binsize_lb=2.0, binsize_ub=500.0,
 #experiment.trainingset_traces[0].setROI([[1000,times[length_training-1]-1000]])
 for tr in experiment.trainingset_traces :
     tr.setROI([[2000., sampling_time*(len(voltage_trace)-1)-2000.]])
+    '''time_start = time.clock()
+    selection = tr.getROI_FarFromSpikes(5., 6.)
+    selection_l = len(selection)
+
+    # Build X matrix for linear regression
+    X = np.zeros((selection_l, 5))
+
+    # Fill first two columns of X matrix
+    X[:, 0] = tr.V[selection]
+    X[:, 1] = tr.I[selection]
+    X[:, 2] = np.ones(selection_l)
+
+    m = GIF_fit.simulate_m(tr.V)
+    print 'm shape '
+    print m.shape
+    m = m[selection]
+    h = GIF_fit.simulate_h(tr.V)
+    h = h[selection]
+    #m = m.reshape((selection_l, 1))
+    #h = h.reshape((selection_l, 1))
+    print 'Done computing m and h.'
+
+    #X_Ca = np.zeros((selection_l, 2))
+    #X_Ca[:, 0] = m * h * X[:, 0]
+    #X_Ca[:, 1] = m * h
+    X[:, 3] = m * h * X[:, 0]
+    X[:, 4] = m * h
+
+    #X = np.concatenate((X, X_Ca), axis=1)
+
+    time_elapsed = time.clock() - time_start
+    print 'Time to simulate = %f' %time_elapsed'''
 
 # To visualize the training set and the ROI call again
-experiment.plotTrainingSet()
+#experiment.plotTrainingSet()
+
 
 # Perform the fit
-GIF_fit.fit(experiment, DT_beforeSpike=5.0)
+is_E_Ca_fixed = True
+GIF_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
 
 # Plot the model parameters
 GIF_fit.plotParameters()
 
 # Save the model
-GIF_TYPE = 'GIF_'
+GIF_TYPE = 'GIF_Ca_'
 #GIF_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
 
-
+'''
 #################################################################################################
 # STEP 3B: FIT iGIF_NP (Mensi et al. 2016 with current-based spike-triggered adaptation)
 #################################################################################################
@@ -263,19 +280,18 @@ iGIF_Na_fit.printParameters()
 GIF_TYPE = 'iGIF_Na_'
 iGIF_Na_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
 
-
 ###################################################################################################
 # STEP 4: EVALUATE MODEL PERFORMANCES ON THE TEST SET DATA
 ###################################################################################################
-
-models = [GIF_fit, iGIF_NP_fit, iGIF_Na_fit]
-labels = ['GIF', 'iGIF_NP', 'iGIF_Na']
+'''
+models = [GIF_fit]
+labels = ['GIF-Ca']
 
 #models = [GIF_fit, iGIF_NP_fit]
 #labels = ['GIF', 'iGIF_NP']
-output_file_md = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_Md.dat','w')
-output_file_md.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
-output_file_md.write('#Cell name\tSig\tIntrinsic reliability\tMd*(GIF)\tMd*(iGIF_NP)\tMd*(iGIF_Na)\n')
+#output_file_md = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_Md.dat','w')
+#output_file_md.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
+#output_file_md.write('#Cell name\tSig\tIntrinsic reliability\tMd*(GIF)\tMd*(iGIF_NP)\tMd*(iGIF_Na)\n')
 
 Md_all = []
 
@@ -297,9 +313,10 @@ for i in np.arange(len(models)) :
     kernelForPSTH = 100.0
     Percent_of_explained_var = prediction.plotRaster(fname, delta=kernelForPSTH)
     print "Explained var by %s = %0.2f" % (labels[i], Percent_of_explained_var)
-output_file_md.write(CELL_NAME[3:6] + '\t' + SPECIFICATION[4:] + '\t' + str(R_X) + '\t' + str(Md_all[0]) + '\t' + str(Md_all[1]) + '\t' + str(Md_all[2]) + '\n')
-output_file_md.close()
+#output_file_md.write(CELL_NAME[3:6] + '\t' + SPECIFICATION[4:] + '\t' + str(R_X) + '\t' + str(Md_all[0]) + '\t' + str(Md_all[1]) + '\t' + str(Md_all[2]) + '\n')
+#output_file_md.close()
 
+'''
 #Compute epsilon_V
 epsilon_V = 0.
 local_counter = 0.
@@ -321,5 +338,39 @@ epsilon_V = epsilon_V / local_counter
 # STEP 5: COMPARE OPTIMAL PARAMETERS OF iGIF_NP AND iGIF_Na
 ###################################################################################################
 GIF_fit.printParameters()
+
 print 'epsilon_V = %f' %epsilon_V
 iGIF.compareModels([iGIF_NP_fit, iGIF_Na_fit], labels=['iGIF_NP', 'iGIF_Na'])
+'''
+
+#################################################################################################
+#    Compare training and test
+#################################################################################################
+V_training = experiment.trainingset_traces[0].V
+I_training = experiment.trainingset_traces[0].I
+(time, V, eta_sum, V_t, S) = GIF_fit.simulate(I_training, V_training[0])
+fig = plt.figure(figsize=(14,5), facecolor='white')
+plt.subplot(2,1,1)
+plt.plot(time/1000, V,'blue', label='Fit')
+plt.plot(time/1000, V_training,'black', label='Data')
+plt.xlim(15,20)
+plt.ylabel('Voltage [mV]')
+plt.title('Training')
+
+V_test = experiment.testset_traces[0].V
+I_test = experiment.testset_traces[0].I
+(time, V, eta_sum, V_t, S) = GIF_fit.simulate(I_test, V_test[0])
+plt.subplot(2,1,2)
+plt.plot(time/1000, V,'blue', label='Fit')
+plt.plot(time/1000, V_test,'black', label='Data')
+plt.xlim(2,7)
+plt.xlabel('Times [s]')
+plt.ylabel('Voltage [mV]')
+plt.title('Test')
+plt.legend()
+if not is_E_Ca_fixed:
+    plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_E_Cafree.png', format='png')
+else:
+    plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_E_Cafixed.png', format='png')
+plt.close(fig)
+#plt.show()
