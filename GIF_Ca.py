@@ -50,12 +50,12 @@ class GIF_Ca(GIF) :
         return 1./(1. + np.exp((V+63.)/8.15))
 
     def tau_m(self, V):
-        #return 2.4 + 22.5/np.cosh((V+39.)/12.)
-        return 10.
+        return 2.4 + 22.5/np.cosh((V+39.)/12.)
+        #return 10.
 
     def tau_h(self, V):
-        #return (V < -50.)*(127. + 0.21*np.exp(50./6.5)) + (V > -50.)*(127. + 0.21*np.exp(-V/6.5))
-        return 300.
+        return (V < -50.)*(127. + 0.21*np.exp(50./6.5)) + (V > -50.)*(127. + 0.21*np.exp(-V/6.5))
+        #return 300.
 
     def simulate_h(self, V):
         """
@@ -83,7 +83,7 @@ class GIF_Ca(GIF) :
 
         return m
 
-    def fit(self, experiment, DT_beforeSpike=5.0):
+    def fit(self, experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=False):
 
         """
         Fit the GIF-Ca model on experimental data.
@@ -100,7 +100,7 @@ class GIF_Ca(GIF) :
 
         self.fitVoltageReset(experiment, self.Tref, do_plot=False)
 
-        self.fitSubthresholdDynamics(experiment, DT_beforeSpike=DT_beforeSpike)
+        self.fitSubthresholdDynamics(experiment, is_E_Ca_fixed, DT_beforeSpike=DT_beforeSpike)
 
         self.fitStaticThreshold(experiment)
 
@@ -111,7 +111,7 @@ class GIF_Ca(GIF) :
     # FUNCTIONS RELATED TO FIT OF SUBTHRESHOLD DYNAMICS (step 2)
     ########################################################################################################
 
-    def fitSubthresholdDynamics(self, experiment, DT_beforeSpike=5.0):
+    def fitSubthresholdDynamics(self, experiment, is_E_Ca_fixed, DT_beforeSpike=5.0):
 
         print "\nGIF-Ca MODEL - Fit subthreshold dynamics..."
 
@@ -132,7 +132,7 @@ class GIF_Ca(GIF) :
                 cnt += 1
                 reprint( "Compute X matrix for repetition %d" % (cnt) )
 
-                (X_tmp, Y_tmp) = self.fitSubthresholdDynamics_Build_Xmatrix_Yvector(tr, DT_beforeSpike=DT_beforeSpike)
+                (X_tmp, Y_tmp) = self.fitSubthresholdDynamics_Build_Xmatrix_Yvector(tr, is_E_Ca_fixed, DT_beforeSpike=DT_beforeSpike)
 
                 X.append(X_tmp)
                 Y.append(Y_tmp)
@@ -161,12 +161,17 @@ class GIF_Ca(GIF) :
 
 
         # Update and print model parameters
-        self.C  = 1./b[1]
-        self.gl = -b[0]*self.C
-        self.El = b[2]*self.C/self.gl
-        self.g_Ca = -b[-2]*self.C
-        self.E_Ca = b[-1]*self.C/self.g_Ca
-        self.eta.setFilter_Coefficients(-b[3:-2]*self.C)
+        self.C = 1. / b[1]
+        self.gl = -b[0] * self.C
+        self.El = b[2] * self.C / self.gl
+
+        if not is_E_Ca_fixed:
+            self.g_Ca = -b[-2]*self.C
+            self.E_Ca = b[-1]*self.C/self.g_Ca
+            self.eta.setFilter_Coefficients(-b[3:-2]*self.C)
+        else:
+            self.g_Ca = -b[-1] * self.C
+            self.eta.setFilter_Coefficients(-b[3:-1] * self.C)
 
         self.printParameters()
 
@@ -199,7 +204,7 @@ class GIF_Ca(GIF) :
         print "Percentage of variance explained (on V): %0.2f" % (var_explained_V*100.0)
 
 
-    def fitSubthresholdDynamics_Build_Xmatrix_Yvector(self, trace, DT_beforeSpike=5.0):
+    def fitSubthresholdDynamics_Build_Xmatrix_Yvector(self, trace, is_E_Ca_fixed, DT_beforeSpike=5.0):
 
         # Length of the voltage trace
         Tref_ind = int(self.Tref/trace.dt)
@@ -222,19 +227,21 @@ class GIF_Ca(GIF) :
         X = np.concatenate( (X, X_eta[selection,:]), axis=1 )
 
         #Compute and fill columns associated with the calcium current
+        print 'Computing m and h...'
         m = self.simulate_m(trace.V)
         m = m[selection]
         h = self.simulate_h(trace.V)
         h = h[selection]
-        m = m.reshape((selection_l, 1))
-        h = h.reshape((selection_l, 1))
+        print 'Done computing m and h.'
 
-        X_Ca = [m*h*X[:, 0], m*h]
-        X_Ca = np.array(X_Ca)
-        X_Ca = X_Ca.reshape((selection_l, 2))
-        X = np.concatenate( (X, X_Ca), axis=1 )
-
-        assert(X.shape[1] == 5)
+        if not is_E_Ca_fixed:
+            tmp = m*h*X[:,0]
+            X = np.concatenate((X, tmp.reshape((selection_l,1))), axis=1)
+            tmp = m*h
+            X = np.concatenate((X, tmp.reshape((selection_l,1))), axis=1)
+        else:
+            tmp = m * h * (X[:, 0] - self.E_Ca)
+            X = np.concatenate((X, tmp.reshape((selection_l, 1))), axis=1)
 
         # Build Y vector (voltage derivative)
 
@@ -246,7 +253,7 @@ class GIF_Ca(GIF) :
 
         # CORRECT SOLUTION TO FIT ARTIFICIAL DATA
         #Y = np.array( np.concatenate( (np.diff(trace.V)/trace.dt, [0]) ) )[selection]
-
+        print 'reached end of function fitSubthresholdDynamics_Build_Xmatrix_Yvector'
         return (X, Y)
 
 
@@ -274,7 +281,7 @@ class GIF_Ca(GIF) :
 
         def simulate(self, I, V0):
             """
-            Simulate the spiking response of the GIF model to an input current I (nA) with time step dt.
+            Simulate the spiking response of the GIF-Ca model to an input current I (nA) with time step dt.
             V0 indicate the initial condition V(0)=V0.
             The function returns:
             - time     : ms, support for V, eta_sum, V_T, spks
@@ -318,10 +325,9 @@ class GIF_Ca(GIF) :
 
             # Set initial condition
             V[0] = V0
-
             code = """
                     #include <math.h>
-
+    
                     int   T_ind      = int(p_T);
                     float dt         = float(p_dt);
 
@@ -338,22 +344,37 @@ class GIF_Ca(GIF) :
 
                     int eta_l        = int(p_eta_l);
                     int gamma_l      = int(p_gamma_l);
-
-
+                    
+                    float m_inf(x){
+                        return 1./( pow((1. + exp((-60.2 - x)/22.4)), 4);
+                    }
+                    
+                    float h_inf(x){
+                        return 1./(1. + exp((x+63.)/8.15));
+                    }
+                    
+                    float tau_m(x){
+                        return 2.4 + 22.5/cosh((x+39.)/12.);
+                    }
+                    
+                    float tau_h(x){
+                        return (x < -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
+                    }
+                    
                     float rand_max  = float(RAND_MAX);
                     float p_dontspike = 0.0 ;
                     float lambda = 0.0 ;
                     float r = 0.0;
-                    float m = 1./( pow((1. + exp((-60.2 - V[0])/22.4)), 4)
-                    float h = 1./(1. + exp((V[0]+63.)/8.15))
+                    float m = m_inf(V[0]);
+                    float h = h_inf(V[0]);
 
                     for (int t=0; t<T_ind-1; t++) {
 
 
                         // INTEGRATE VOLTAGE
-                        V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*h(V[t] - ECa);
-                        m = m + (dt/(2.4 + 22.5/cosh((V[t]+39.)/12.)))*(1./( pow((1. + exp((-60.2 - V[t])/22.4)), 4) - m)
-                        h = h + (dt/((V[t] < -50.)*(127. + 0.21*exp(50./6.5)) + (V[t] > -50.)*(127. + 0.21*exp(-V[t]/6.5)))) * (1./(1. + exp((V[t]+63.)/8.15)) - h)
+                        V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*h(V[t] - ECa) );
+                        m = m + ( dt/tau_m(V[t]) )*( m_inf(V[t]) - m );
+                        h = h + ( dt/tau_h(V[t]) )*( h_inf(V[t]) - h );
                         
                         // COMPUTE PROBABILITY OF EMITTING ACTION POTENTIAL
                         lambda = lambda0*exp( (V[t+1]-Vt_star-gamma_sum[t])/DeltaV );
@@ -419,7 +440,7 @@ class GIF_Ca(GIF) :
         print "Vr (mV):\t%0.3f" % (self.Vr)
         print "Vt* (mV):\t%0.3f" % (self.Vt_star)
         print "DV (mV):\t%0.3f" % (self.DV)
-        print "gl (uS):\t%0.3f" % (self.g_Ca)
+        print "g_Ca (uS):\t%0.3f" % (self.g_Ca)
         print "ECa (mV):\t%0.3f" % (self.E_Ca)
         print "-------------------------\n"
 
