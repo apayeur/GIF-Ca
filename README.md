@@ -1,5 +1,5 @@
 # GIF-Ca
-Fitting a GIF neural model with subthreshold calcium dynamics to data
+Fitting a GIF neural model with voltage-dependent calcium current to data
 
 This code builds upon the code found in https://github.com/pozzorin/GIFFittingToolbox 
 It implements a GIF (Generalized Integrate-and-Fire, a close cousin of GLM and SRM) neuron model with subthreshold calcium dynamics, and fits its parameters to experimental data. The calcium dynamics appears as an added term in the total current of the basic GIF model.
