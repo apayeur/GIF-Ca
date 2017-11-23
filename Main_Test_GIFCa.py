@@ -135,18 +135,18 @@ print 'Intrinsic reliability = %f' %R_X
 #################################################################################################
 
 # Create a new object GIF
-GIF_fit = GIF_Ca(sampling_time)
+GIF_Ca_fit = GIF_Ca(sampling_time)
 
 # Define parameters
-GIF_fit.Tref = 6.0
+GIF_Ca_fit.Tref = 6.0
 
-GIF_fit.eta = Filter_Rect_LogSpaced()
-GIF_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
-#5HT GIF_fit.eta.setMetaParameters(length=5000.0, binsize_lb=2.0, binsize_ub=1000.0, slope=4.5)
+GIF_Ca_fit.eta = Filter_Rect_LogSpaced()
+GIF_Ca_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
+#5HT GIF_Ca_fit.eta.setMetaParameters(length=5000.0, binsize_lb=2.0, binsize_ub=1000.0, slope=4.5)
 
-GIF_fit.gamma = Filter_Rect_LogSpaced()
-GIF_fit.gamma.setMetaParameters(length=2000.0, binsize_lb=2.0, binsize_ub=500.0, slope=5.0)
-#5HT GIF_fit.gamma.setMetaParameters(length=5000.0, binsize_lb=5.0, binsize_ub=1000.0, slope=5.0)
+GIF_Ca_fit.gamma = Filter_Rect_LogSpaced()
+GIF_Ca_fit.gamma.setMetaParameters(length=2000.0, binsize_lb=2.0, binsize_ub=500.0, slope=5.0)
+#5HT GIF_Ca_fit.gamma.setMetaParameters(length=5000.0, binsize_lb=5.0, binsize_ub=1000.0, slope=5.0)
 
 # Define the ROI of the training set to be used for the fit
 #experiment.trainingset_traces[0].setROI([[1000,times[length_training-1]-1000]])
@@ -164,11 +164,11 @@ for tr in experiment.trainingset_traces :
     X[:, 1] = tr.I[selection]
     X[:, 2] = np.ones(selection_l)
 
-    m = GIF_fit.simulate_m(tr.V)
+    m = GIF_Ca_fit.simulate_m(tr.V)
     print 'm shape '
     print m.shape
     m = m[selection]
-    h = GIF_fit.simulate_h(tr.V)
+    h = GIF_Ca_fit.simulate_h(tr.V)
     h = h[selection]
     #m = m.reshape((selection_l, 1))
     #h = h.reshape((selection_l, 1))
@@ -190,15 +190,41 @@ for tr in experiment.trainingset_traces :
 
 
 # Perform the fit
-is_E_Ca_fixed = True
-GIF_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
+is_E_Ca_fixed = False
+GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
+
+# Plot the model parameters
+GIF_Ca_fit.plotParameters()
+
+# Save the model
+GIF_TYPE = 'GIF_Ca_'
+#GIF_Ca_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
+
+
+#################################################################################################
+# FIT standard GIF
+#################################################################################################
+
+# Create a new object GIF
+GIF_fit = GIF(sampling_time)
+
+# Define parameters
+GIF_fit.Tref = 6.0
+
+GIF_fit.eta = Filter_Rect_LogSpaced()
+GIF_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
+#5HT GIF_fit.eta.setMetaParameters(length=5000.0, binsize_lb=2.0, binsize_ub=1000.0, slope=4.5)
+
+GIF_fit.gamma = Filter_Rect_LogSpaced()
+GIF_fit.gamma.setMetaParameters(length=2000.0, binsize_lb=2.0, binsize_ub=500.0, slope=5.0)
+#5HT GIF_fit.gamma.setMetaParameters(length=5000.0, binsize_lb=5.0, binsize_ub=1000.0, slope=5.0)
+
+GIF_fit.fit(experiment, DT_beforeSpike=5.0)
 
 # Plot the model parameters
 GIF_fit.plotParameters()
 
-# Save the model
-GIF_TYPE = 'GIF_Ca_'
-#GIF_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
+
 
 '''
 #################################################################################################
@@ -284,8 +310,8 @@ iGIF_Na_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONA
 # STEP 4: EVALUATE MODEL PERFORMANCES ON THE TEST SET DATA
 ###################################################################################################
 '''
-models = [GIF_fit]
-labels = ['GIF-Ca']
+models = [GIF_fit, GIF_Ca_fit]
+labels = ['GIF', 'GIF-Ca']
 
 #models = [GIF_fit, iGIF_NP_fit]
 #labels = ['GIF', 'iGIF_NP']
@@ -304,11 +330,26 @@ for i in np.arange(len(models)) :
 
     print "\n Model: ", labels[i]
 
-    # compute Md*
+    # Compute epsilon_V
+    epsilon_V = 0.
+    local_counter = 0.
+    for tr in experiment.testset_traces:
+        SSE = 0.
+        VAR = 0.
+        # tr.detectSpikesWithDerivative(threshold=10)
+        (time, V_est, eta_sum_est) = model.simulateDeterministic_forceSpikes(tr.I, tr.V[0], tr.getSpikeTimes())
+        indices_tmp = tr.getROI_FarFromSpikes(5., model.Tref)
 
-    Md = prediction.computeMD_Kistler(8.0, GIF_fit.dt*2.)
+        SSE += sum((V_est[indices_tmp] - tr.V[indices_tmp]) ** 2)
+        VAR += len(indices_tmp) * np.var(tr.V[indices_tmp])
+        epsilon_V += 1.0 - SSE / VAR
+        local_counter += 1
+    epsilon_V = epsilon_V / local_counter
+    print 'epsilon_V = %f' % epsilon_V
+
+    # Compute Md*
+    Md = prediction.computeMD_Kistler(8.0, model.dt*2.)
     Md_all.append(Md)
-
     fname = PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION +'_'+ labels[i] + '_ExpVsModel.png'
     kernelForPSTH = 100.0
     Percent_of_explained_var = prediction.plotRaster(fname, delta=kernelForPSTH)
@@ -316,54 +357,46 @@ for i in np.arange(len(models)) :
 #output_file_md.write(CELL_NAME[3:6] + '\t' + SPECIFICATION[4:] + '\t' + str(R_X) + '\t' + str(Md_all[0]) + '\t' + str(Md_all[1]) + '\t' + str(Md_all[2]) + '\n')
 #output_file_md.close()
 
-'''
-#Compute epsilon_V
-epsilon_V = 0.
-local_counter = 0.
-for tr in experiment.testset_traces:
-    SSE = 0.
-    VAR = 0.
-    #tr.detectSpikesWithDerivative(threshold=10)
-    (time, V_est, eta_sum_est) = iGIF_NP_fit.simulateDeterministic_forceSpikes(tr.I, tr.V[0], tr.getSpikeTimes())
-    indices_tmp = tr.getROI_FarFromSpikes(0.0, iGIF_NP_fit.Tref)
 
-    SSE += sum((V_est[indices_tmp] - tr.V[indices_tmp]) ** 2)
-    VAR += len(indices_tmp) * np.var(tr.V[indices_tmp])
-    epsilon_V += 1.0 - SSE / VAR
-    local_counter += 1
-epsilon_V = epsilon_V / local_counter
+
 
 
 ###################################################################################################
-# STEP 5: COMPARE OPTIMAL PARAMETERS OF iGIF_NP AND iGIF_Na
+# STEP 5: COMPARE model parameters
 ###################################################################################################
+GIF_Ca_fit.printParameters()
 GIF_fit.printParameters()
 
-print 'epsilon_V = %f' %epsilon_V
-iGIF.compareModels([iGIF_NP_fit, iGIF_Na_fit], labels=['iGIF_NP', 'iGIF_Na'])
-'''
+#iGIF.compareModels([GIF_Ca_fit, GIF_fit], labels=['GIF_Ca', 'GIF'])
+
 
 #################################################################################################
-#    Compare training and test
+#    Compare training and test for GIF
 #################################################################################################
 V_training = experiment.trainingset_traces[0].V
 I_training = experiment.trainingset_traces[0].I
-(time, V, eta_sum, V_t, S) = GIF_fit.simulate(I_training, V_training[0])
+(time, V, eta_sum, V_t, S) = GIF_Ca_fit.simulate(I_training, V_training[0])
+(time, V_GIF, eta_sum, V_t, S) = GIF_fit.simulate(I_training, V_training[0])
 fig = plt.figure(figsize=(14,5), facecolor='white')
 plt.subplot(2,1,1)
-plt.plot(time/1000, V,'blue', label='Fit')
-plt.plot(time/1000, V_training,'black', label='Data')
-plt.xlim(15,20)
+plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
+plt.plot(time/1000, V_GIF,'--r', lw=0.5, label='GIF')
+plt.plot(time/1000, V_training,'black', lw=0.5, label='Data')
+plt.xlim(17,20)
+plt.ylim(-75,0)
 plt.ylabel('Voltage [mV]')
 plt.title('Training')
 
 V_test = experiment.testset_traces[0].V
 I_test = experiment.testset_traces[0].I
-(time, V, eta_sum, V_t, S) = GIF_fit.simulate(I_test, V_test[0])
+(time, V, eta_sum, V_t, S) = GIF_Ca_fit.simulate(I_test, V_test[0])
+(time, V_GIF, eta_sum, V_t, S) = GIF_fit.simulate(I_test, V_test[0])
 plt.subplot(2,1,2)
-plt.plot(time/1000, V,'blue', label='Fit')
-plt.plot(time/1000, V_test,'black', label='Data')
-plt.xlim(2,7)
+plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
+plt.plot(time/1000, V_GIF,'--r', lw=0.5, label='GIF')
+plt.plot(time/1000, V_test,'black', lw=0.5, label='Data')
+plt.xlim(4,7)
+plt.ylim(-80,0)
 plt.xlabel('Times [s]')
 plt.ylabel('Voltage [mV]')
 plt.title('Test')

@@ -44,7 +44,7 @@ class GIF_Ca(GIF) :
         self.g_Ca = 0.01  # uS, maximal conductance of VDCC
 
     def m_inf(self, V):
-        return 1./( (1. + np.exp((-60.2 - V)/22.4))**4 )
+        return 1./( (1. + np.exp((-60.2 - V)/22.4)) )
 
     def h_inf(self, V):
         return 1./(1. + np.exp((V+63.)/8.15))
@@ -235,12 +235,12 @@ class GIF_Ca(GIF) :
         print 'Done computing m and h.'
 
         if not is_E_Ca_fixed:
-            tmp = m*h*X[:,0]
+            tmp = m**4*h*X[:,0]
             X = np.concatenate((X, tmp.reshape((selection_l,1))), axis=1)
-            tmp = m*h
+            tmp = m**4*h
             X = np.concatenate((X, tmp.reshape((selection_l,1))), axis=1)
         else:
-            tmp = m * h * (X[:, 0] - self.E_Ca)
+            tmp = m**4 * h * (X[:, 0] - self.E_Ca)
             X = np.concatenate((X, tmp.reshape((selection_l, 1))), axis=1)
 
         # Build Y vector (voltage derivative)
@@ -346,7 +346,8 @@ class GIF_Ca(GIF) :
                     int gamma_l      = int(p_gamma_l);
                     
                     float m_inf(x){
-                        return 1./( pow((1. + exp((-60.2 - x)/22.4)), 4);
+                        //return 1./( pow((1. + exp((-60.2 - x)/22.4)), 4);
+                        return 1./(1. + exp((-60.2 - x)/22.4));
                     }
                     
                     float h_inf(x){
@@ -372,7 +373,7 @@ class GIF_Ca(GIF) :
 
 
                         // INTEGRATE VOLTAGE
-                        V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*h(V[t] - ECa) );
+                        V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*m*m*m*h(V[t] - ECa) );
                         m = m + ( dt/tau_m(V[t]) )*( m_inf(V[t]) - m );
                         h = h + ( dt/tau_h(V[t]) )*( h_inf(V[t]) - h );
                         
@@ -421,6 +422,119 @@ class GIF_Ca(GIF) :
 
             return (time, V, eta_sum, V_T, spks)
 
+
+        def simulateDeterministic_forceSpikes(self, I, V0, spks):
+
+            """
+            Simulate the subthresohld response of the GIF-Ca model to an input current I (nA) with time step dt.
+            Adaptation currents are enforced at times specified in the list spks (in ms) given as an argument to the function.
+            V0 indicate the initial condition V(0)=V0.
+            The function returns:
+            - time     : ms, support for V, eta_sum, V_T, spks
+            - V        : mV, membrane potential
+            - eta_sum  : nA, adaptation current
+            """
+
+            # Input parameters
+            p_T = len(I)
+            p_dt = self.dt
+
+            # Model parameters
+            p_gl = self.gl
+            p_C = self.C
+            p_El = self.El
+            p_Vr = self.Vr
+            p_Tref = self.Tref
+            p_Tref_i = int(self.Tref / self.dt)
+            p_gCa = self.g_Ca
+            p_ECa = self.E_Ca
+
+            # Model kernel
+            (p_eta_support, p_eta) = self.eta.getInterpolatedFilter(self.dt)
+            p_eta = p_eta.astype('double')
+            p_eta_l = len(p_eta)
+
+            # Define arrays
+            V = np.array(np.zeros(p_T), dtype="double")
+            I = np.array(I, dtype="double")
+            spks = np.array(spks, dtype="double")
+            spks_i = Tools.timeToIndex(spks, self.dt)
+
+            # Compute adaptation current (sum of eta triggered at spike times in spks)
+            eta_sum = np.array(np.zeros(int(p_T + 1.1 * p_eta_l + p_Tref_i)), dtype="double")
+
+            for s in spks_i:
+                eta_sum[s + 1 + p_Tref_i: s + 1 + p_Tref_i + p_eta_l] += p_eta
+
+            eta_sum = eta_sum[:p_T]
+
+            # Set initial condition
+            V[0] = V0
+
+            code = """
+                    #include <math.h>
+
+                    int   T_ind      = int(p_T);
+                    float dt         = float(p_dt);
+
+                    float gl         = float(p_gl);
+                    float C          = float(p_C);
+                    float El         = float(p_El);
+                    float Vr         = float(p_Vr);
+                    int   Tref_ind   = int(float(p_Tref)/dt);
+
+                   float m_inf(x){
+                            //return 1./( pow((1. + exp((-60.2 - x)/22.4)), 4);
+                        return 1./(1. + exp((-60.2 - x)/22.4));
+               }
+                    
+                    float h_inf(x){
+                        return 1./(1. + exp((x+63.)/8.15));
+                    }
+                    
+                    float tau_m(x){
+                        return 2.4 + 22.5/cosh((x+39.)/12.);
+                    }
+                    
+                    float tau_h(x){
+                        return (x < -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
+                    }
+
+                    int next_spike = spks_i[0] + Tref_ind;
+                    int spks_cnt = 0;
+                    float m = m_inf(V[0]);
+                    float h = h_inf(V[0]);
+
+
+                    for (int t=0; t<T_ind-1; t++) {
+
+
+                        // INTEGRATE VOLTAGE
+                        V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*m*m*m*h(V[t] - ECa) );
+                        m = m + ( dt/tau_m(V[t]) )*( m_inf(V[t]) - m );
+                        h = h + ( dt/tau_h(V[t]) )*( h_inf(V[t]) - h );
+
+
+                        if ( t == next_spike ) {
+                            spks_cnt = spks_cnt + 1;
+                            next_spike = spks_i[spks_cnt] + Tref_ind;
+                            V[t-1] = 0 ;
+                            V[t] = Vr ;
+                            t=t-1;
+                        }
+
+                    }
+
+                    """
+
+            vars = ['p_T', 'p_dt', 'p_gl', 'p_C', 'p_El', 'p_Vr', 'p_Tref', 'V', 'I', 'eta_sum', 'spks_i']
+
+            v = weave.inline(code, vars)
+
+            time = np.arange(p_T) * self.dt
+            eta_sum = eta_sum[:p_T]
+
+            return (time, V, eta_sum)
 
     ##############################################################################################################
     # PRINT PARAMETRES
