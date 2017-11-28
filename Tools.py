@@ -6,6 +6,7 @@ import weave
 
 import sys
 import scipy.io as sio
+import neo
 
 #import GIF
 #from Experiment import *
@@ -227,31 +228,52 @@ def getIndicesDuringSpikes(T, spikes_i, dt_after, initial_cutoff, dt) :
 # Load AEC data
 ###########################################################
 def load_AEC_data(filename):
-    mat_contents = sio.loadmat(filename)
-    analogSignalsAEC = mat_contents['analogSignals']
-    timesAEC = mat_contents['times']
-    timesAEC = timesAEC.reshape(timesAEC.size)
-    lengthAEC = timesAEC[len(timesAEC) - 1]
-    voltage_traceAEC = analogSignalsAEC[0, 0, :]
-    current_traceAEC = analogSignalsAEC[1, 0, :] - 5.  # Correction for exp bias
-    maxT = int((lengthAEC - 0.5) / (timesAEC[1] - timesAEC[0]))
-    minT = int(0.5 / (timesAEC[1] - timesAEC[0]))
-    current_traceAEC = current_traceAEC[minT:maxT]
-    voltage_traceAEC = voltage_traceAEC[minT:maxT]
-    timesAEC = timesAEC[minT:maxT] * 10. ** 3
-    sampling_time = timesAEC[1] - timesAEC[0]
+    if filename.find('.mat') > 0:
+        mat_contents = sio.loadmat(filename)
+        analogSignalsAEC = mat_contents['analogSignals']
+        timesAEC = mat_contents['times']
+        timesAEC = timesAEC.reshape(timesAEC.size)
+        lengthAEC = timesAEC[-1]
+        voltage_traceAEC = analogSignalsAEC[0, 0, :]
+        current_traceAEC = analogSignalsAEC[1, 0, :] - 5.  # Correction for exp bias
+        maxT = int((lengthAEC - 0.5) / (timesAEC[1] - timesAEC[0]))
+        minT = int(0.5 / (timesAEC[1] - timesAEC[0]))
+        current_traceAEC = current_traceAEC[minT:maxT]
+        voltage_traceAEC = voltage_traceAEC[minT:maxT]
+        timesAEC = timesAEC[minT:maxT] * 10. ** 3
+        sampling_time = timesAEC[1] - timesAEC[0]
+    elif filename.find('.abf') > 0:
+        r = neo.io.AxonIO(filename=filename)
+        bl = r.read_block()
+        voltage_traceAEC = bl.segments[0].analogsignals[0].magnitude
+        current_traceAEC = bl.segments[0].analogsignals[1].magnitude - 5.
+        timesAEC = bl.segments[0].analogsignals[0].times.rescale('ms').magnitude
+        lengthAEC = timesAEC[-1]
+        sampling_time = timesAEC[1] - timesAEC[0]
+        maxT = int((lengthAEC - 0.5) / sampling_time)
+        minT = int(0.5 / sampling_time)
+        current_traceAEC = current_traceAEC[minT:maxT]
+        voltage_traceAEC = voltage_traceAEC[minT:maxT]
     return (sampling_time, voltage_traceAEC, current_traceAEC)
 
 
 def load_training_data(filename):
-    mat_contents = sio.loadmat(filename)
-    analogSignals = mat_contents['analogSignals']
-    voltage_trace = analogSignals[0,0,:]
-    current_trace = analogSignals[1,0,:] - 5.   #offset due to uncalibrated current
-    times = mat_contents['times'];
-    times = times.reshape(times.size)
-    times = times*10.**3                        #convert to ms
-    sampling_time = times[1] - times[0]
+    if filename.find('.mat') > 0:
+        mat_contents = sio.loadmat(filename)
+        analogSignals = mat_contents['analogSignals']
+        voltage_trace = analogSignals[0,0,:]
+        current_trace = analogSignals[1,0,:] - 5.   #offset due to uncalibrated current
+        times = mat_contents['times'];
+        times = times.reshape(times.size)
+        times = times*10.**3                        #convert to ms
+        sampling_time = times[1] - times[0]
+    elif filename.find('.abf') > 0:
+        r = neo.io.AxonIO(filename=filename)
+        bl = r.read_block()
+        voltage_trace = bl.segments[0].analogsignals[0].magnitude
+        current_trace = bl.segments[0].analogsignals[1].magnitude - 5.
+        times = bl.segments[0].analogsignals[0].times.rescale('ms').magnitude
+        sampling_time = times[1] - times[0]
     return (sampling_time, voltage_trace, current_trace)
 
 

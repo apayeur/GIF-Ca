@@ -42,19 +42,23 @@ class GIF_Ca(GIF) :
 
         self.E_Ca = 20.0  # mV, reversal potential associated with the voltage-dependent calcium current
         self.g_Ca = 0.01  # uS, maximal conductance of VDCC
+        self.shift = 0. # mV shift in the in/activation curves with respect to some ground truth
+
+    def set_shift(self, val):
+        self.shift = val
 
     def m_inf(self, V):
-        return 1./( (1. + np.exp((-60.2 - V)/22.4)) )
+         return 1./( (1. + np.exp((-60.2 + self.shift - V)/22.4)) )
 
     def h_inf(self, V):
-        return 1./(1. + np.exp((V+63.)/8.15))
+        return 1./(1. + np.exp((V+63.-self.shift)/8.15))
 
     def tau_m(self, V):
         return 2.4 + 22.5/np.cosh((V+39.)/12.)
         #return 10.
 
     def tau_h(self, V):
-        return (V < -50.)*(127. + 0.21*np.exp(50./6.5)) + (V > -50.)*(127. + 0.21*np.exp(-V/6.5))
+        return (V <= -50.)*(127. + 0.21*np.exp(50./6.5)) + (V > -50.)*(127. + 0.21*np.exp(-V/6.5))
         #return 300.
 
     def simulate_h(self, V):
@@ -62,12 +66,38 @@ class GIF_Ca(GIF) :
         :param V: vector of voltages for a given training
         :return: array of h
         """
-        h = np.zeros(V.size)
+
+        h = np.array(np.zeros(V.size), dtype="double")
         h[0] = self.h_inf(V[0])
+        p_dt = self.dt
+        p_N = V.size
+        V = np.array(V, dtype="double")
+        h_inf_vec = np.array(self.h_inf(V), dtype="double")
+        tau_h_vec = np.array(self.tau_h(V), dtype="double")
 
-        for i in xrange(V.size-1):
-            h[i+1] = h[i] + (self.dt/self.tau_h(V[i]))*(self.h_inf(V[i]) - h[i])
+        code = """
+            #include <math.h>
+            float dt = float(p_dt);
+            int N    = int(p_N);
+            double h_inf;
+            double tau_h;
 
+            for(int i=0; i<N-1; i++){
+                //h_inf =  1./(1. + exp((V[i]+63.)/8.15));
+                //tau_h = (V[i] <= -50.)*(127. + 0.21*exp(50./6.5)) + (V[i] > -50.)*(127. + 0.21*exp(-V[i]/6.5));
+                h[i+1] = h[i] + (dt/tau_h_vec[i])*(h_inf_vec[i] - h[i]);
+                
+            }
+            """
+        vars = ['h', 'p_dt', 'V', 'p_N', 'h_inf_vec', 'tau_h_vec']
+        v = weave.inline(code, vars)
+
+
+        #h = np.zeros(V.size)
+        #h[0] = self.h_inf(V[0])
+
+        #for i in xrange(V.size-1):
+        #    h[i+1] = h[i] + (self.dt/self.tau_h(V[i]))*(self.h_inf(V[i]) - h[i])
         return h
 
     def simulate_m(self, V):
@@ -75,11 +105,36 @@ class GIF_Ca(GIF) :
         :param V: vector of voltages for a given training
         :return: array of m
         """
-        m = np.zeros(V.size)
+        m = np.array(np.zeros(V.size), dtype="double")
         m[0] = self.m_inf(V[0])
+        p_dt = self.dt
+        p_N = V.size
+        V = np.array(V, dtype="double")
+        m_inf_vec = np.array(self.m_inf(V), dtype="double")
+        tau_m_vec = np.array(self.tau_m(V), dtype="double")
 
-        for i in xrange(V.size-1):
-            m[i + 1] = m[i] + (self.dt / self.tau_m(V[i])) * (self.m_inf(V[i]) - m[i])
+        code = """
+              #include <math.h>
+              float dt = float(p_dt);
+              int N    = int(p_N);
+              double m_inf;
+              double tau_m;
+ 
+              for(int i=0; i<N-1; i++){
+                  //m_inf =  1./(1. + exp((-60.2 - V[i])/22.4));
+                  //tau_m = 2.4 + 22.5/cosh((V[i]+39.)/12.);
+                  //m[i+1] = m[i] + (dt/tau_m_vec[i])*(m_inf_vec[i] - m[i]);
+                  m[i+1] = ( m[i] + (dt/tau_m_vec[i])*m_inf_vec[i] )/(1 + dt/tau_m_vec[i]);
+              }
+              """
+        vars = ['m', 'p_dt', 'V', 'p_N', 'm_inf_vec', 'tau_m_vec']
+        v = weave.inline(code, vars)
+
+        #m = np.zeros(V.size)
+        #m[0] = self.m_inf(V[0])
+
+        #for i in xrange(V.size-1):
+        #    m[i + 1] = m[i] + (self.dt / self.tau_m(V[i])) * (self.m_inf(V[i]) - m[i])
 
         return m
 
@@ -100,12 +155,12 @@ class GIF_Ca(GIF) :
 
         self.fitVoltageReset(experiment, self.Tref, do_plot=False)
 
-        self.fitSubthresholdDynamics(experiment, is_E_Ca_fixed, DT_beforeSpike=DT_beforeSpike)
+        (var_explained_dV, var_explained_V) = self.fitSubthresholdDynamics(experiment, is_E_Ca_fixed, DT_beforeSpike=DT_beforeSpike)
 
         self.fitStaticThreshold(experiment)
 
         self.fitThresholdDynamics(experiment)
-
+        return (var_explained_dV, var_explained_V)
 
     ########################################################################################################
     # FUNCTIONS RELATED TO FIT OF SUBTHRESHOLD DYNAMICS (step 2)
@@ -202,7 +257,7 @@ class GIF_Ca(GIF) :
         var_explained_V = 1.0 - SSE / VAR
 
         print "Percentage of variance explained (on V): %0.2f" % (var_explained_V*100.0)
-
+        return (var_explained_dV*100.0, var_explained_V*100.0)
 
     def fitSubthresholdDynamics_Build_Xmatrix_Yvector(self, trace, is_E_Ca_fixed, DT_beforeSpike=5.0):
 
@@ -227,12 +282,10 @@ class GIF_Ca(GIF) :
         X = np.concatenate( (X, X_eta[selection,:]), axis=1 )
 
         #Compute and fill columns associated with the calcium current
-        print 'Computing m and h...'
         m = self.simulate_m(trace.V)
         m = m[selection]
         h = self.simulate_h(trace.V)
         h = h[selection]
-        print 'Done computing m and h.'
 
         if not is_E_Ca_fixed:
             tmp = m**4*h*X[:,0]
@@ -325,6 +378,7 @@ class GIF_Ca(GIF) :
 
             # Set initial condition
             V[0] = V0
+
             code = """
                     #include <math.h>
     
@@ -359,7 +413,7 @@ class GIF_Ca(GIF) :
                     }
                     
                     float tau_h(x){
-                        return (x < -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
+                        return (x <= -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
                     }
                     
                     float rand_max  = float(RAND_MAX);
@@ -497,7 +551,7 @@ class GIF_Ca(GIF) :
                     }
                     
                     float tau_h(x){
-                        return (x < -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
+                        return (x <= -50.)*(127. + 0.21*exp(50./6.5)) + (x > -50.)*(127. + 0.21*exp(-x/6.5));
                     }
 
                     int next_spike = spks_i[0] + Tref_ind;
