@@ -191,7 +191,18 @@ for tr in experiment.trainingset_traces :
 
 # Perform the fit
 is_E_Ca_fixed = False
-GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
+shifts = np.arange(0., 40., 10.)
+Vm = np.arange(-100., 40., 5)
+window_current_no_shift = GIF_Ca.m_inf(Vm)**4*GIF_Ca.h_inf(Vm)
+for shift in shifts:
+    GIF_Ca_fit.shift = shift
+    plt.plot(Vm, window_current_no_shift)
+    plt.plot(Vm, GIF_Ca.m_inf(Vm-shift)**4*GIF_Ca.h_inf(Vm-shift))
+    plt.xlabel('Voltage [mV]')
+    plt.show()
+    (var_explained_dV, var_explained_V) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
+
+temp = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
 
 # Plot the model parameters
 GIF_Ca_fit.plotParameters()
@@ -337,10 +348,10 @@ for i in np.arange(len(models)) :
         SSE = 0.
         VAR = 0.
         # tr.detectSpikesWithDerivative(threshold=10)
-        (time, V_est, eta_sum_est) = model.simulateDeterministic_forceSpikes(tr.I, tr.V[0], tr.getSpikeTimes())
+        r = model.simulateDeterministic_forceSpikes(tr.I, tr.V[0], tr.getSpikeTimes())
         indices_tmp = tr.getROI_FarFromSpikes(5., model.Tref)
 
-        SSE += sum((V_est[indices_tmp] - tr.V[indices_tmp]) ** 2)
+        SSE += sum((r[1][indices_tmp] - tr.V[indices_tmp]) ** 2)
         VAR += len(indices_tmp) * np.var(tr.V[indices_tmp])
         epsilon_V += 1.0 - SSE / VAR
         local_counter += 1
@@ -405,5 +416,32 @@ if not is_E_Ca_fixed:
     plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_E_Cafree.png', format='png')
 else:
     plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_E_Cafixed.png', format='png')
+plt.close(fig)
+#plt.show()
+
+
+# Figure comparing V_model, V_data and I during training with forced spikes
+(time, V, eta_sum) = GIF_Ca_fit.simulateDeterministic_forceSpikes(I_training, V_training[0], experiment.trainingset_traces[0].getSpikeTimes())
+(time, V_GIF, eta_sum) = GIF_fit.simulateDeterministic_forceSpikes(I_training, V_training[0], experiment.trainingset_traces[0].getSpikeTimes())
+fig = plt.figure(figsize=(14,5), facecolor='white')
+plt.subplot(2,1,1)
+plt.plot(time/1000, I_training,'-b', lw=0.5, label='$I$')
+#plt.plot(time/1000, I_Ca,'--r', lw=0.5, label='$I_\mathrm{Ca}$')
+plt.xlim(17,20)
+plt.ylabel('Current [nA]')
+plt.title('Training')
+plt.subplot(2,1,2)
+plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
+plt.plot(time/1000, V_GIF,'--r', lw=0.5, label='GIF')
+plt.plot(time/1000, V_training,'black', lw=0.5, label='Data')
+plt.xlim(17,20)
+plt.ylim(-75,0)
+plt.ylabel('Time [s]')
+plt.ylabel('Voltage [mV]')
+
+if not is_E_Ca_fixed:
+    plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + 'V_I_E_Cafree.png', format='png')
+else:
+    plt.savefig(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + 'V_I_E_Cafixed.png', format='png')
 plt.close(fig)
 #plt.show()

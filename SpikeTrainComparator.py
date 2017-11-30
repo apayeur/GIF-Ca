@@ -241,6 +241,7 @@ class SpikeTrainComparator :
 
         plt.xlabel("Time (ms)")
         plt.ylabel('PSTH (Hz)')
+        plt.tight_layout()
         plt.savefig(fname, format='png')
 
         # Compute % of variance explained
@@ -250,4 +251,4 @@ class SpikeTrainComparator :
 
         return float(pct_variance_explained)
         print "Percentage of variance explained: %0.1f" % (pct_variance_explained)
-        plt.show()
+        #plt.show()

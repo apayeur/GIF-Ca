@@ -677,7 +677,7 @@ class GIF(ThresholdModel) :
 
         # Start by fitting a constant firing threshold, the result is used as initial condition to fit dynamic threshold
 
-        print "\nGIF MODEL - Fit static threshold...\n"
+        print "\nFit static threshold...\n"
 
         # Define initial conditions (based on the average firing rate in the training set)
 
@@ -716,7 +716,7 @@ class GIF(ThresholdModel) :
 
         # Fit a dynamic threshold using a initial condition the result obtained by fitting a static threshold
 
-        print "\nGIF MODEL - Fit dynamic threshold...\n"
+        print "\nFit dynamic threshold...\n"
 
         # Perform fit
         beta0_dynamicThreshold = np.concatenate( ( [1/self.DV], [-self.Vt_star/self.DV], self.gamma.getCoefficients()/self.DV))

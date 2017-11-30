@@ -203,12 +203,17 @@ for tr in experiment.trainingset_traces :
 
 # Perform the fit
 is_E_Ca_fixed = False
-
+'''
 shifts = np.arange(5., 20., 5.)
 for shift in shifts:
     (var_explained_dV, var_explained_V) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
     print "Percentage of variance explained (on dV/dt) for shift = %f: %0.2f" % (shift, var_explained_dV)
     print "Percentage of variance explained (on V): %0.2f" % (shift, var_explained_V)
+'''
+(var_explained_dV, var_explained_V) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
+print "Percentage of variance explained (on dV/dt) for shift = %f: %0.2f" % (0., var_explained_dV)
+print "Percentage of variance explained (on V): %0.2f" % (0., var_explained_V)
+
 
 # Plot the model parameters
 #GIF_Ca_fit.plotParameters()
