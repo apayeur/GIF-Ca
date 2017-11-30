@@ -31,8 +31,8 @@ the spike train similarity measure Md*. The test dataset consists of 9 injection
 generated according to an Ornstein-Uhlenbeck process whose standard deviation was modulated with a sin function.
 """
 
-CELL_NAME = 'DRN159_5HT'
-PATH_DATA = './eighth_set/'+CELL_NAME+'/'
+CELL_NAME = 'DRN651_5HT'
+PATH_DATA = './ninth_set/'+CELL_NAME+'/'
 PATH_RESULTS = './Results/'+CELL_NAME+'/'
 SPECIFICATION = ''
 ADDITIONAL_SPECIFIER = ''
@@ -145,6 +145,10 @@ print 'Intrinsic reliability = %f' %R_X
 #################################################################################################
 # STEP 3: FIT GIF-Ca MODEL
 #################################################################################################
+# Create file object to store epsilon_V values
+output_file_eps = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_epsilonV.dat','w')
+output_file_eps.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
+output_file_eps.write('#Cell name\teps_V_train(GIF)\teps_V_train(GIF-Ca)\n')
 
 # Create a new object GIF
 GIF_Ca_fit = GIF_Ca(sampling_time)
@@ -210,17 +214,14 @@ for shift in shifts:
     print "Percentage of variance explained (on dV/dt) for shift = %f: %0.2f" % (shift, var_explained_dV)
     print "Percentage of variance explained (on V): %0.2f" % (shift, var_explained_V)
 '''
-(var_explained_dV, var_explained_V) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
-print "Percentage of variance explained (on dV/dt) for shift = %f: %0.2f" % (0., var_explained_dV)
-print "Percentage of variance explained (on V): %0.2f" % (0., var_explained_V)
-
+(var_explained_dV, var_explained_V_GIF_Ca_train) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0, is_E_Ca_fixed=is_E_Ca_fixed)
 
 # Plot the model parameters
 #GIF_Ca_fit.plotParameters()
 
 # Save the model
-#GIF_TYPE = 'GIF_Ca_'
-#GIF_Ca_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
+GIF_TYPE = 'GIF_Ca_'
+GIF_Ca_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
 
 
 #################################################################################################
@@ -241,10 +242,10 @@ GIF_fit.gamma = Filter_Rect_LogSpaced()
 GIF_fit.gamma.setMetaParameters(length=2000.0, binsize_lb=2.0, binsize_ub=500.0, slope=5.0)
 #5HT GIF_fit.gamma.setMetaParameters(length=5000.0, binsize_lb=5.0, binsize_ub=1000.0, slope=5.0)
 
-GIF_fit.fit(experiment, DT_beforeSpike=5.0)
+(var_explained_dV, var_explained_V_GIF_train) = GIF_fit.fit(experiment, DT_beforeSpike=5.0)
 
 # Plot the model parameters
-GIF_fit.plotParameters()
+#GIF_fit.plotParameters()
 
 
 
@@ -261,7 +262,7 @@ theta_inf_nbbins  = 10                      # Number of rect functions used to d
                                             # the rect function
                                             # is computed automatically based on the voltage distribution).
 
-theta_tau_all     = np.linspace(5.,10., 10)  # tau_theta is the timescale of the threshold-voltage coupling
+theta_tau_all     = np.linspace(10.,20., 10)  # tau_theta is the timescale of the threshold-voltage coupling
 
 
 # Create the new model used for the fit
@@ -280,7 +281,7 @@ iGIF_NP_fit.fit(experiment, theta_inf_nbbins=theta_inf_nbbins, theta_tau_all=the
 
 # Plot optimal parameters
 
-iGIF_NP_fit.plotParameters()
+#iGIF_NP_fit.plotParameters()
 
 # Save the model
 GIF_TYPE = 'iGIF_NP_'
@@ -330,8 +331,8 @@ iGIF_Na_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONA
 ###################################################################################################
 # STEP 4: EVALUATE MODEL PERFORMANCES ON THE TEST SET DATA
 ###################################################################################################
-models = [GIF_fit, GIF_Ca_fit, iGIF_NP_fit]
-labels = ['GIF', 'GIF_Ca', 'iGIF_NP']
+models = [GIF_Ca_fit, GIF_fit, iGIF_NP_fit]
+labels = ['GIF_Ca', 'GIF', 'iGIF_NP']
 
 #models = [GIF_fit, iGIF_NP_fit]
 #labels = ['GIF', 'iGIF_NP']
@@ -340,7 +341,7 @@ output_file_md.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\
 output_file_md.write('#Cell name\tSig\tIntrinsic reliability\tMd*(GIF)\tMd*(GIF-Ca)\tMd*(iGIF-NP)\n')
 
 Md_all = []
-
+epsilon_V_test = {}
 for i in np.arange(len(models)) :
 
     model = models[i]
@@ -365,6 +366,7 @@ for i in np.arange(len(models)) :
         epsilon_V += 1.0 - SSE / VAR
         local_counter += 1
     epsilon_V = epsilon_V / local_counter
+    epsilon_V_test[labels[i]] = epsilon_V
     print 'epsilon_V = %f' % epsilon_V
 
     # Compute Md*
@@ -374,9 +376,10 @@ for i in np.arange(len(models)) :
     kernelForPSTH = 100.0
     Percent_of_explained_var = prediction.plotRaster(fname, delta=kernelForPSTH)
     print "Explained var by %s = %0.2f" % (labels[i], Percent_of_explained_var)
+output_file_eps.write(CELL_NAME[3:6] + '\t' + str(var_explained_V_GIF_train) + '\t' + str(var_explained_V_GIF_Ca_train) + '\t' + str(epsilon_V_test['GIF']) + '\t'+ str(epsilon_V_test['GIF_Ca'])+'\n')
 output_file_md.write(CELL_NAME[3:6] + '\t' + SPECIFICATION[4:] + '\t' + str(R_X) + '\t' + str(Md_all[0]) + '\t' + str(Md_all[1]) + '\t' + str(Md_all[2]) + '\n')
 output_file_md.close()
-
+output_file_eps.close()
 
 
 
@@ -434,7 +437,7 @@ I_training = experiment.trainingset_traces[0].I
 (time, V, eta_sum, V_t, S) = iGIF_NP_fit.simulate(I_training, V_training[0])
 fig = plt.figure(figsize=(14,5), facecolor='white')
 plt.subplot(2,1,1)
-plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
+plt.plot(time/1000, V,'-b', lw=0.5, label='iGIF-NP')
 plt.plot(time/1000, V_training,'black', lw=0.5, label='Data')
 plt.xlim(17,20)
 plt.ylim(-75,40)
@@ -445,7 +448,7 @@ V_test = experiment.testset_traces[0].V
 I_test = experiment.testset_traces[0].I
 (time, V, eta_sum, V_t, S) = iGIF_NP_fit.simulate(I_test, V_test[0])
 plt.subplot(2,1,2)
-plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
+plt.plot(time/1000, V,'-b', lw=0.5, label='iGIF-NP')
 plt.plot(time/1000, V_test,'black', lw=0.5, label='Data')
 plt.xlim(4,7)
 plt.ylim(-80,40)

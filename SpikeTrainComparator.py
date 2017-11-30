@@ -216,7 +216,7 @@ class SpikeTrainComparator :
         for spks in self.spks_model[:nb_rep] :
             cnt -= 1
             plt.plot(spks, cnt*np.ones(len(spks)), '|', color='red', ms=5, mew=2)
-
+        plt.ylabel('Neuron #')
         plt.ylim(cnt - 0.1, 0.1)
         plt.yticks([])
 

@@ -481,12 +481,13 @@ class GIF(ThresholdModel) :
 
         self.fitVoltageReset(experiment, self.Tref, do_plot=False)
 
-        self.fitSubthresholdDynamics(experiment, DT_beforeSpike=DT_beforeSpike)
+        (var_explained_dV, var_explained_V) = self.fitSubthresholdDynamics(experiment, DT_beforeSpike=DT_beforeSpike)
 
         self.fitStaticThreshold(experiment)
 
         self.fitThresholdDynamics(experiment)
 
+        return (var_explained_dV, var_explained_V)
 
 
     ########################################################################################################
@@ -626,6 +627,7 @@ class GIF(ThresholdModel) :
         var_explained_V = 1.0 - SSE / VAR
 
         print "Percentage of variance explained (on V): %0.2f" % (var_explained_V*100.0)
+        return (var_explained_dV*100.0, var_explained_V*100.0)
 
 
     def fitSubthresholdDynamics_Build_Xmatrix_Yvector(self, trace, DT_beforeSpike=5.0):

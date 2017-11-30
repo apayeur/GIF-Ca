@@ -15,12 +15,9 @@ from Tools import reprint
 
 class GIF_Ca(GIF) :
     """
-     Generalized Integrate and Fire model with voltage-dependent calcium current (VDCC)
-
+     Generalized Integrate and Fire model with voltage-dependent calcium current (VDCC).
      Spike are produced stochastically with firing intensity:
-
      lambda(t) = lambda0 * exp( (V(t)-V_T(t))/DV ),
-
      where the membrane potential dynamics is given by:
 
      C dV/dt = -gl(V-El) + I - sum_j eta(t-\hat t_j) - g_Ca*m*h(V-E_Ca),
@@ -95,13 +92,6 @@ class GIF_Ca(GIF) :
             """
         vars = ['h', 'p_dt', 'V', 'p_N', 'h_inf_vec', 'tau_h_vec']
         v = weave.inline(code, vars)
-
-
-        #h = np.zeros(V.size)
-        #h[0] = self.h_inf(V[0])
-
-        #for i in xrange(V.size-1):
-        #    h[i+1] = h[i] + (self.dt/self.tau_h(V[i]))*(self.h_inf(V[i]) - h[i])
         return h
 
     def simulate_m(self, V):
@@ -130,13 +120,6 @@ class GIF_Ca(GIF) :
               """
         vars = ['m', 'p_dt', 'V', 'p_N', 'm_inf_vec', 'tau_m_vec']
         v = weave.inline(code, vars)
-
-        #m = np.zeros(V.size)
-        #m[0] = self.m_inf(V[0])
-
-        #for i in xrange(V.size-1):
-        #    m[i + 1] = m[i] + (self.dt / self.tau_m(V[i])) * (self.m_inf(V[i]) - m[i])
-
         return m
 
 
@@ -297,7 +280,6 @@ class GIF_Ca(GIF) :
                         if (t+1 < T_ind-1)
                             V[t+1] = Vr;
 
-
                         // UPDATE ADAPTATION PROCESSES
                         for(int j=0; j<eta_l; j++)
                             eta_sum[t+1+j] += p_eta[j];
@@ -310,7 +292,6 @@ class GIF_Ca(GIF) :
                 }
                 """
                 
-
         vars = ['p_T', 'p_dt', 'p_gl', 'p_C', 'p_El', 'p_Vr', 'p_Tref', 'p_Vt_star', 'p_DV', 'p_lambda0', 'p_gCa',
                 'p_ECa', 'p_shift', 'V', 'I',
                 'p_eta', 'p_eta_l', 'eta_sum', 'p_gamma', 'gamma_sum', 'p_gamma_l', 'spks']
@@ -337,7 +318,6 @@ class GIF_Ca(GIF) :
         - V        : mV, membrane potential
         - eta_sum  : nA, adaptation current
         """
-        #print "######## Simulate with forced spikes... ########"
         # Input parameters
         p_T = len(I)
         p_dt = self.dt
@@ -452,7 +432,6 @@ class GIF_Ca(GIF) :
 
                 }
                 """
-                
 
         vars = ['p_T', 'p_dt', 'p_gl', 'p_C', 'p_El', 'p_Vr', 'p_Tref', 'p_shift', 'p_gCa', 'p_ECa', 'V', 'I',
                 'I_Ca', 'eta_sum', 'spks_i']
