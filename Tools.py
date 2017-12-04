@@ -274,7 +274,7 @@ def load_training_data(filename):
         current_trace = bl.segments[0].analogsignals[1].magnitude - 5.
         times = bl.segments[0].analogsignals[0].times.rescale('ms').magnitude
         sampling_time = times[1] - times[0]
-    return (sampling_time, voltage_trace, current_trace)
+    return (sampling_time, voltage_trace, current_trace, times)
 
 
 ##########################################################

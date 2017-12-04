@@ -442,6 +442,134 @@ class GIF_Ca(GIF) :
 
         return time, V, eta_sum
 
+    def I_Ca_with_Deterministic_forceSpikes(self, I, V0, spks):
+        """
+        Simulate the subthresohld response of the GIF-Ca model to an input current I (nA) with time step dt.
+        Output I_Ca.
+        """
+        # Input parameters
+        p_T = len(I)
+        p_dt = self.dt
+
+        # Model parameters
+        p_gl = self.gl
+        p_C = self.C
+        p_El = self.El
+        p_Vr = self.Vr
+        p_Tref = self.Tref
+        p_Tref_i = int(self.Tref / self.dt)
+        p_gCa = self.g_Ca
+        p_ECa = self.E_Ca
+        p_shift = self.shift
+
+        # Model kernel
+        (p_eta_support, p_eta) = self.eta.getInterpolatedFilter(self.dt)
+        p_eta = p_eta.astype('double')
+        p_eta_l = len(p_eta)
+
+        # Define arrays
+        V = np.array(np.zeros(p_T), dtype="double")
+        I = np.array(I, dtype="double")
+        I_Ca = np.array(np.zeros(p_T), dtype="double")
+
+        spks = np.array(spks, dtype="double")
+        spks_i = Tools.timeToIndex(spks, self.dt)
+
+        # Compute adaptation current (sum of eta triggered at spike times in spks)
+        eta_sum = np.array(np.zeros(int(p_T + 1.1 * p_eta_l + p_Tref_i)), dtype="double")
+
+        for s in spks_i:
+            eta_sum[s + 1 + p_Tref_i: s + 1 + p_Tref_i + p_eta_l] += p_eta
+
+        eta_sum = eta_sum[:p_T]
+
+        # Set initial condition
+        V[0] = V0
+        """
+        m = GIF_Ca.m_inf(V0)
+        h = GIF_Ca.h_inf(V0)
+        I_Ca[0] = -p_gCa * m * m * m * m * h * (V0 - p_ECa)
+        spks_cnt = 0
+        next_spike = spks_i[0] + p_Tref_i
+
+        for t in xrange(p_T - 1):
+            # INTEGRATE VOLTAGE
+            V[t + 1] = V[t] + p_dt / p_C * (
+            -p_gl * (V[t] - p_El) + I[t] - eta_sum[t] - p_gCa * m * m * m * m * h * (V[t] - p_ECa))
+            m = m + (p_dt / GIF_Ca.tau_m(V[t] - p_shift)) * (GIF_Ca.m_inf(V[t] - p_shift) - m)
+            h = h + (p_dt / GIF_Ca.tau_h(V[t] - p_shift)) * (GIF_Ca.h_inf(V[t] - p_shift) - h)
+            I_Ca[t + 1] = -p_gCa * m * m * m * m * h * (V[t + 1] - p_ECa)
+            if t == next_spike :
+                spks_cnt = spks_cnt + 1
+                if spks_cnt < len(spks_i):
+                    next_spike = spks_i[spks_cnt] + p_Tref_i
+                V[t-1] = 0
+                V[t] = p_Vr
+                t=t-1
+
+
+
+        """
+
+        code = """
+                #include <math.h>
+
+                int   T_ind      = int(p_T);
+                float dt         = float(p_dt);
+                float shift      = float(p_shift);
+                float gl         = float(p_gl);
+                float C          = float(p_C);
+                float El         = float(p_El);
+                float Vr         = float(p_Vr);
+                int   Tref_ind   = int(float(p_Tref)/dt);
+                float gCa        = float(p_gCa);
+                float ECa        = float(p_ECa);
+
+                int next_spike = spks_i[0] + Tref_ind;
+                int spks_cnt = 0;
+                float m = 1./(1. + exp((-60.2 - V[0]+shift)/22.4));
+                float h = 1. / (1. + exp((V[0] - shift + 63.) / 8.15));
+
+                I_Ca[0] = -gCa*m*m*m*m*h*(V[0] - ECa);
+
+                float m_inf_val;
+                float h_inf_val;
+                float tau_m_val;
+                float tau_h_val;
+
+                for (int t=0; t<T_ind-1; t++) {
+
+
+                    // INTEGRATE VOLTAGE
+                    V[t+1] = V[t] + dt/C*( -gl*(V[t] - El) + I[t] - eta_sum[t] - gCa*m*m*m*m*h*(V[t] - ECa) );
+                    m_inf_val = 1./( (1. + exp((-60.2 - (V[t]-shift))/22.4)) );
+                    h_inf_val = 1. / (1. + exp((V[t] - shift + 63.) / 8.15));
+                    tau_m_val = 2.4 + 22.5/cosh((V[t]-shift+39.)/12.);
+                    tau_h_val = ((V[t]-shift) <= -50.)*(127. + 0.21*exp(50./6.5)) + ((V[t]-shift) > -50.)*(127. + 0.21*exp(-((V[t]-shift))/6.5));
+
+                    m = m + (dt/tau_m_val)*( m_inf_val - m );
+                    h = h + (dt/tau_h_val)*( h_inf_val - h );
+                    I_Ca[t+1] = -gCa*m*m*m*m*h*(V[t+1] - ECa);
+
+                    if ( t == next_spike ) {
+                        spks_cnt = spks_cnt + 1;
+                        next_spike = spks_i[spks_cnt] + Tref_ind;
+                        V[t-1] = 0 ;
+                        V[t] = Vr ;
+                        t=t-1;
+                    }
+
+                }
+                """
+
+        vars = ['p_T', 'p_dt', 'p_gl', 'p_C', 'p_El', 'p_Vr', 'p_Tref', 'p_shift', 'p_gCa', 'p_ECa', 'V', 'I',
+                'I_Ca', 'eta_sum', 'spks_i']
+
+        v = weave.inline(code, vars)
+
+
+        return I_Ca
+
 
     ########################################################################################################
     # FUNCTIONS FOR FITTING
