@@ -25,7 +25,7 @@ epsilon_V_test = {}
 PVar = {}
 
 # List separate experiments in separate folder
-data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set']
+data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set', 'tenth_set']
 
 # For all experiments, extract the cell names
 CellNames = {}
@@ -46,7 +46,7 @@ for experiment_folder in data_folders_for_separate_experiments:
         #################################################################################################
 
         path_data = './' + experiment_folder + '/' + cell_name + '/'
-        path_results = './Results/' + cell_name + '/'
+        path_results = '../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + cell_name + '/'
 
         # Find extension of data files
         file_names = os.listdir(path_data)
@@ -77,7 +77,7 @@ for experiment_folder in data_folders_for_separate_experiments:
         if filename_test.find('.mat') > 0:
             mat_contents = sio.loadmat(filename_test)
             analogSignals = mat_contents['analogSignals']
-            times_test = mat_contents['times'];
+            times_test = mat_contents['times']
             times_test = times_test.reshape(times_test.size)
             times_test = times_test*10.**3
             sampling_time_test = times_test[1] - times_test[0]
@@ -123,7 +123,8 @@ for experiment_folder in data_folders_for_separate_experiments:
         GIF_fit = GIF(sampling_time)
 
         # Define parameters
-        GIF_fit.Tref = 6.0
+        GIF_fit.Tref = experiment.extract_abs_ref_period()
+        print 'refractory period = %f' %GIF_fit.Tref
 
         GIF_fit.eta = Filter_Rect_LogSpaced()
         GIF_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
@@ -221,7 +222,7 @@ for experiment_folder in data_folders_for_separate_experiments:
         plt.savefig(path_results  + cell_name + '_GIF_simulateForcedSpikes_Training.png', format='png')
         plt.close(fig)
 
-output_file = open('./Results/' + 'GIF_FitPerformance.dat','w')
+output_file = open('../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + 'GIF_FitPerformance.dat','w')
 output_file.write('#Cell name\tMd*\tEpsilonV\tPVar\n')
 
 for experiment_folder in data_folders_for_separate_experiments:

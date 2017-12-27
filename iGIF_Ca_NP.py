@@ -340,10 +340,11 @@ class iGIF_Ca_NP(iGIF_Ca) :
 
         self.fitStaticThreshold(experiment)
 
-        self.fitThresholdDynamics(experiment, theta_tau_all, do_plot=do_plot)
+        L_all = self.fitThresholdDynamics(experiment, theta_tau_all, do_plot=do_plot)
 
         self.fit_flag = True
 
+        return L_all
 
 
 
@@ -407,7 +408,7 @@ class iGIF_Ca_NP(iGIF_Ca) :
 
         # Perform fit
         beta0_dynamicThreshold = np.concatenate( ( [1/self.DV], [-self.Vt_star/self.DV], self.gamma.getCoefficients()/self.DV, self.theta_i))
-        (beta_opt, theta_tau_opt) = self.maximizeLikelihood_dynamicThreshold(experiment, beta0_dynamicThreshold, theta_tau_all, do_plot=do_plot)
+        (beta_opt, theta_tau_opt, L_all) = self.maximizeLikelihood_dynamicThreshold(experiment, beta0_dynamicThreshold, theta_tau_all, do_plot=do_plot)
 
         # Store result
         self.DV      = 1.0/beta_opt[0]
@@ -418,6 +419,7 @@ class iGIF_Ca_NP(iGIF_Ca) :
 
         self.printParameters()
 
+        return L_all
 
 
 
@@ -531,7 +533,7 @@ class iGIF_Ca_NP(iGIF_Ca) :
             plt.show()
 
 
-        return (beta_opt, theta_tau_opt)
+        return (beta_opt, theta_tau_opt, L_all)
 
 
 

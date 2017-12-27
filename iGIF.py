@@ -127,7 +127,7 @@ class iGIF(GIF) :
 
 
     @classmethod
-    def compareModels(cls, iGIFs, labels=None):
+    def compareModels(cls, iGIFs, fname, labels=None):
 
         """
         Given a list of iGIF models, iGIFs, the function produce a plot in which the model parameters are compared.
@@ -202,7 +202,7 @@ class iGIF(GIF) :
 
         #plt.xscale('log', nonposx='clip')
         #plt.yscale('log', nonposy='clip')
-        plt.xlim([eta_support[0], eta_support[-1]])
+        plt.xlim([eta_support[0], 25.])
         plt.xlabel('Time (ms)')
         plt.ylabel('Eta (ms)')
 
@@ -245,7 +245,8 @@ class iGIF(GIF) :
 
         #plt.xscale('log', nonposx='clip')
         #plt.yscale('log', nonposy='clip')
-        plt.xlim([gamma_support[0]+0.1, gamma_support[-1]])
+        #plt.xlim([gamma_support[0]+0.1, gamma_support[-1]])
+        plt.xlim([gamma_support[0] + 0.1, 300.])
         plt.xlabel('Time (ms)')
         plt.ylabel('Gamma (mV)')
 
@@ -270,12 +271,12 @@ class iGIF(GIF) :
         plt.ylabel('Threshold theta (mV)')
 
         plt.subplots_adjust(left=0.08, bottom=0.10, right=0.95, top=0.93, wspace=0.25, hspace=0.25)
-
-        plt.show()
+        plt.savefig(fname, format='png')
+        plt.close()
 
 
     @classmethod
-    def plotAverageModel(cls, iGIFs):
+    def plotAverageModel(cls, iGIFs, fname):
 
 
         """
@@ -329,5 +330,5 @@ class iGIF(GIF) :
         plt.xlabel('tau theta (ms)')
         Tools.removeAxis(plt.gca(), ['top', 'left', 'right'])
         plt.yticks([])
-
-        plt.show()
+        plt.savefig(fname, format='png')
+        plt.close()

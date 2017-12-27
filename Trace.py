@@ -317,7 +317,7 @@ class Trace :
 
                 while (t < T_i) {
 
-                    if ((V[t+1]-V[t-1])/(2*dt) >= threshold) {
+                    if ((V[t+1]-V[t-1])/(2*dt) >= threshold && V[t]>0.) {
                         spike_train[t] = 1.0;
                         t += ref_ind;
                     }
@@ -334,6 +334,39 @@ class Trace :
         spks_ind = np.where(spike_train == 1.0)[0]
 
         self.spks = np.array(spks_ind)
+        self.spks_flag = True
+
+
+    def detectSpikesAllen(self, threshold=20.0):
+
+        """
+        Detect action potentials using the method in
+        Generalized Leaky Integrate-And-Fire Models Classify Multiple
+        Neuron Types (2017) Teeter et al.
+        """
+        dVdt = np.gradient(self.V, self.dt)
+        indices_where_dVdt_greater_than_threshold =  np.where(dVdt > threshold)[0]
+
+        starts_of_upstrokes = indices_where_dVdt_greater_than_threshold[np.where(np.diff(indices_where_dVdt_greater_than_threshold)>1)[0]+1]
+        ends_of_upstrokes = indices_where_dVdt_greater_than_threshold[np.where(np.diff(indices_where_dVdt_greater_than_threshold)>1)[0]]
+
+        all_starts_of_upstrokes = np.concatenate((np.array([indices_where_dVdt_greater_than_threshold[0]]), starts_of_upstrokes), axis=0)
+        all_ends_of_upstrokes = np.concatenate((ends_of_upstrokes, np.array([indices_where_dVdt_greater_than_threshold[-1]])), axis=0)
+
+
+        avg_max_dVdt = 0
+        for i, start in enumerate(all_starts_of_upstrokes):
+            upstroke = dVdt[start:all_ends_of_upstrokes[i]+1] # end of upstroke included, hence the +1
+            avg_max_dVdt += np.max(upstroke)
+        avg_max_dVdt /= all_starts_of_upstrokes.size
+
+        new_threshold = 0.05*avg_max_dVdt
+        indices_where_dVdt_greater_than_threshold = np.where(dVdt > threshold)[0]
+
+        spike_ind_except_first = indices_where_dVdt_greater_than_threshold[
+            np.where(np.diff(indices_where_dVdt_greater_than_threshold) > 1)[0] + 1]
+
+        self.spks = np.concatenate((np.array([indices_where_dVdt_greater_than_threshold[0]]), spike_ind_except_first), axis=0)
         self.spks_flag = True
 
 

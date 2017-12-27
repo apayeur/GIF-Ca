@@ -154,8 +154,8 @@ class AEC_Badel(AEC) :
         
         print "\nCompensate experiment"
         
-        print "AEC trace..."
-        self.deconvolveTrace(expr.AEC_trace)
+        #print "AEC trace..."
+        #self.deconvolveTrace(expr.AEC_trace)
 
         print "Training set..."        
         for tr in expr.trainingset_traces :
@@ -176,8 +176,8 @@ class AEC_Badel(AEC) :
         
         trace.V = V_aec
         trace.AEC_flag = True
-        trace.detectSpikesWithDerivative(threshold=15)
-        #trace.detectSpikes()
+        #trace.detectSpikesWithDerivative(threshold=15)
+        trace.detectSpikesAllen()
    
     
 

@@ -70,11 +70,22 @@ for experiment_folder in data_folders_for_separate_experiments:
         experiment.addTrainingSetTrace(voltage_trace, 10**-3, current_trace, 10**-12, len(voltage_trace)*sampling_time, FILETYPE='Array')
         #Note: once added to experiment, current is converted to nA.
 
+        # Create new object to perform AEC
+        myAEC = AEC_Badel(experiment.dt)
+
+        # Define metaparametres
+        myAEC.K_opt.setMetaParameters(length=150.0, binsize_lb=experiment.dt, binsize_ub=2.0, slope=30.0,
+                                      clamp_period=1.0)
+        myAEC.p_expFitRange = [3.0, 150.0]
+        myAEC.p_nbRep = 15
+
+        # Assign myAEC to experiment and compensate the voltage recordings
+        experiment.setAEC(myAEC)
+        experiment.performAEC()
+
         # Compute spike shapes
         tr = experiment.trainingset_traces[0]
         (support, all_spikes, spike_nb, prev_spike, spike_width) = tr.returnSpikeShapes()
-
-        print min_max_mean(tr.I)
 
 
         # Plot
@@ -94,5 +105,5 @@ for experiment_folder in data_folders_for_separate_experiments:
         counter += 1
 fig.set_tight_layout(True)
 #plt.show()
-plt.savefig(path_results + 'SpikeShape.png')
+plt.savefig(path_results + 'SpikeShapeAllen.png')
 plt.close()

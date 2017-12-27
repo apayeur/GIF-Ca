@@ -1090,13 +1090,13 @@ class GIF(ThresholdModel) :
         plt.ylabel('Gamma (mV)')
 
         plt.subplots_adjust(left=0.08, bottom=0.10, right=0.95, top=0.93, wspace=0.25, hspace=0.25)
-        plt.savefig(fname, format='pdf')
-        plt.show()
+        plt.savefig(fname, format='png')
+        plt.close()
 
 
 
     @classmethod
-    def plotAverageModel(cls, GIFs, fname):
+    def plotAverageModel(cls, GIFs, fname=None):
 
         """
         Average model parameters and plot summary data.
@@ -1192,7 +1192,7 @@ class GIF(ThresholdModel) :
         plt.plot([K_support[0], K_support[-1]], [0,0], ls=':', color='black', lw=2, zorder=-1)
 
         #plt.xlim([K_support[0], K_support[-1]])
-        plt.xlim([K_support[0], 300.])
+        plt.xlim([K_support[0], 200.])
         Tools.removeAxis(plt.gca(), ['top', 'right'])
         plt.xlabel('Time (ms)')
         plt.ylabel('Spike-triggered threshold (mV)')
@@ -1315,5 +1315,6 @@ class GIF(ThresholdModel) :
         plt.xlabel('$\Delta V$ (mV)')
         Tools.removeAxis(plt.gca(), ['top', 'left', 'right'])
         plt.yticks([])
-
-        plt.savefig(fname, format='pdf')
+        if fname!=None:
+            plt.savefig(fname, format='png')
+            plt.close()

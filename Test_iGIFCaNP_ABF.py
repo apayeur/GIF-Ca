@@ -32,7 +32,7 @@ the spike train similarity measure Md*. The test dataset consists of 9 injection
 generated according to an Ornstein-Uhlenbeck process whose standard deviation was modulated with a sin function.
 """
 
-CELL_NAME = 'DRN655_5HT'
+CELL_NAME = 'DRN652_5HT'
 PATH_DATA = './ninth_set/'+CELL_NAME+'/'
 PATH_RESULTS = './Results/'+CELL_NAME+'/'
 SPECIFICATION = ''
@@ -146,10 +146,6 @@ print 'Intrinsic reliability = %f' %R_X
 #################################################################################################
 # STEP 3: FIT GIF-Ca MODEL
 #################################################################################################
-# Create file object to store epsilon_V values
-output_file_eps = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_epsilonV.dat','w')
-output_file_eps.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
-output_file_eps.write('#Cell name\teps_V_train(GIF)\teps_V_train(GIF-Ca)\n')
 
 # Create a new object GIF
 GIF_Ca_fit = GIF_Ca(sampling_time)
@@ -207,7 +203,7 @@ for tr in experiment.trainingset_traces :
 
 
 # Perform the fit
-is_E_Ca_fixed = False
+is_E_Ca_fixed = True
 '''
 shifts = np.arange(5., 20., 5.)
 for shift in shifts:
@@ -221,7 +217,11 @@ for shift in shifts:
 #GIF_Ca_fit.plotParameters()
 
 # Save the model
-GIF_TYPE = 'GIF_Ca_'
+if not is_E_Ca_fixed:
+    spec_GIF_Ca = 'E_Ca_free_'
+else:
+    spec_GIF_Ca = 'E_Ca_fixed_'
+GIF_TYPE = 'GIF_Ca_' + spec_GIF_Ca
 GIF_Ca_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
 
 
@@ -234,7 +234,7 @@ theta_inf_nbbins  = 10                      # Number of rect functions used to d
                                             # the rect function
                                             # is computed automatically based on the voltage distribution).
 
-theta_tau_all     = np.linspace(5.,15., 10)  # tau_theta is the timescale of the threshold-voltage coupling
+theta_tau_all     = np.linspace(30.,40., 10)  # tau_theta is the timescale of the threshold-voltage coupling
 
 # Create the new model used for the fit
 iGIF_Ca_NP_fit = iGIF_Ca_NP(experiment.dt)
@@ -250,7 +250,7 @@ iGIF_Ca_NP_fit.fit(experiment, theta_inf_nbbins=theta_inf_nbbins, theta_tau_all=
 iGIF_Ca_NP_fit.plotParameters()
 
 # Save the model
-GIF_TYPE = 'iGIF_Ca_NP_'
+GIF_TYPE = 'iGIF_Ca_NP_' + spec_GIF_Ca
 iGIF_Ca_NP_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONAL_SPECIFIER + '.pck')
 
 
@@ -348,9 +348,13 @@ iGIF_Na_fit.save(PATH_RESULTS + GIF_TYPE + CELL_NAME + SPECIFICATION + ADDITIONA
 models = [GIF_fit, GIF_Ca_fit, iGIF_NP_fit, iGIF_Ca_NP_fit]
 labels = ['GIF', 'GIF_Ca', 'iGIF_NP', 'iGIF_Ca_NP']
 
-output_file_md = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + '_Md.dat','w')
+output_file_md = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + spec_GIF_Ca +'_Md.dat','w')
 output_file_md.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
 output_file_md.write('#Cell name\tSig\tIntrinsic reliability\tMd*(GIF)\tMd*(GIF-Ca)\tMd*(iGIF-NP)\tMd*(iGIF-Ca-NP)\n')
+
+output_file_eps = open(PATH_RESULTS + CELL_NAME + ADDITIONAL_SPECIFIER  + SPECIFICATION + spec_GIF_Ca + '_epsilonV.dat','w')
+output_file_eps.write('#' + CELL_NAME + ADDITIONAL_SPECIFIER + SPECIFICATION + '\n')
+output_file_eps.write('#Cell name\teps_V_train(GIF)\teps_V_train(GIF-Ca)\n')
 
 Md_all = []
 epsilon_V_test = {}

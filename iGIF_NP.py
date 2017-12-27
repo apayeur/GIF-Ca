@@ -62,7 +62,7 @@ class iGIF_NP(iGIF) :
         Compute and return the nonlinear coupling f(V), as well as its support, according to the rectangular basis functions and its coefficients.
         """
 
-        support = np.linspace(-100, 0.0, 1000)
+        support = np.linspace(-100, 50., 1000)
         dV = support[1]-support[0]
 
         theta_inf = np.ones(len(support))*self.Vt_star
@@ -486,10 +486,11 @@ class iGIF_NP(iGIF) :
 
         self.fitStaticThreshold(experiment)
 
-        self.fitThresholdDynamics(experiment, theta_tau_all, do_plot=do_plot)
+        L_all = self.fitThresholdDynamics(experiment, theta_tau_all, do_plot=do_plot)
 
         self.fit_flag = True
 
+        return L_all
 
 
 
@@ -553,7 +554,7 @@ class iGIF_NP(iGIF) :
 
         # Perform fit
         beta0_dynamicThreshold = np.concatenate( ( [1/self.DV], [-self.Vt_star/self.DV], self.gamma.getCoefficients()/self.DV, self.theta_i))
-        (beta_opt, theta_tau_opt) = self.maximizeLikelihood_dynamicThreshold(experiment, beta0_dynamicThreshold, theta_tau_all, do_plot=do_plot)
+        (beta_opt, theta_tau_opt, L_all) = self.maximizeLikelihood_dynamicThreshold(experiment, beta0_dynamicThreshold, theta_tau_all, do_plot=do_plot)
 
         # Store result
         self.DV      = 1.0/beta_opt[0]
@@ -564,7 +565,7 @@ class iGIF_NP(iGIF) :
 
         self.printParameters()
 
-
+        return L_all
 
 
     def maximizeLikelihood_dynamicThreshold(self, experiment, beta0, theta_tau_all, maxIter=10**3, stopCond=10**-6, do_plot=False) :
@@ -677,7 +678,7 @@ class iGIF_NP(iGIF) :
             plt.show()
 
 
-        return (beta_opt, theta_tau_opt)
+        return (beta_opt, theta_tau_opt, L_all)
 
 
 

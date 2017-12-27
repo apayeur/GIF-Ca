@@ -25,7 +25,7 @@ epsilon_V_test = {}
 PVar = {}
 
 # List separate experiments in separate folder
-data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set']
+data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set', 'tenth_set']
 
 # For all experiments, extract the cell names
 CellNames = {}
@@ -48,7 +48,7 @@ for experiment_folder in data_folders_for_separate_experiments:
         #################################################################################################
 
         path_data = './' + experiment_folder + '/' + cell_name + '/'
-        path_results = './Results/' + cell_name + '/'
+        path_results = '../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + cell_name + '/'
 
         # Find extension of data files
         file_names = os.listdir(path_data)
@@ -124,7 +124,9 @@ for experiment_folder in data_folders_for_separate_experiments:
         iGIF_NP_fit = iGIF_NP(experiment.dt)
 
         # Define parameters
-        iGIF_NP_fit.Tref = 6.0
+        #iGIF_NP_fit.Tref = 6.0
+        iGIF_NP_fit.Tref = experiment.extract_abs_ref_period()
+        print 'refractory period = %f' % iGIF_NP_fit.Tref
         iGIF_NP_fit.eta = Filter_Rect_LogSpaced()
         iGIF_NP_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
         iGIF_NP_fit.gamma = Filter_Rect_LogSpaced()
@@ -197,15 +199,14 @@ for experiment_folder in data_folders_for_separate_experiments:
         #################################################################################################
         #  PLOT TRAINING AND TEST TRACES, MODEL VS EXPERIMENT
         #################################################################################################
-
-        #Comparison for training and test sets w/o inactivation
         V_training = experiment.trainingset_traces[0].V
         I_training = experiment.trainingset_traces[0].I
         (time, V, eta_sum, V_t, S) = iGIF_NP_fit.simulate(I_training, V_training[0])
         fig = plt.figure(figsize=(10,6), facecolor='white')
         plt.subplot(2,1,1)
-        plt.plot(time/1000, V,'--r', lw=0.5, label='iGIF-NP')
+        plt.plot(time/1000, V,'-r', lw=0.5, label='iGIF-NP')
         plt.plot(time/1000, V_training,'black', lw=0.5, label='Data')
+        plt.plot(time/1000, V_t,'--b', lw=0.5, label='$V_T$')
         plt.xlim(18,20)
         plt.ylim(-80,20)
         plt.ylabel('Voltage [mV]')
@@ -215,8 +216,9 @@ for experiment_folder in data_folders_for_separate_experiments:
         I_test = experiment.testset_traces[0].I
         (time, V, eta_sum, V_t, S) = iGIF_NP_fit.simulate(I_test, V_test[0])
         plt.subplot(2,1,2)
-        plt.plot(time/1000, V,'--r', lw=0.5, label='iGIF-NP')
+        plt.plot(time/1000, V,'-r', lw=0.5, label='iGIF-NP')
         plt.plot(time/1000, V_test,'black', lw=0.5, label='Data')
+        plt.plot(time/1000, V_t,'--b', lw=0.5, label='$V_T$')
         plt.xlim(5,7)
         plt.ylim(-80,20)
         plt.xlabel('Times [s]')
@@ -227,7 +229,7 @@ for experiment_folder in data_folders_for_separate_experiments:
         plt.savefig(path_results  + cell_name + '_iGIF_NP_simulate.png', format='png')
         plt.close()
 
-output_file = open('./Results/' + 'iGIF_NP_FitPerformance.dat','w')
+output_file = open('../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + 'iGIF_NP_FitPerformance_FreeTauRef.dat','w')
 output_file.write('#Cell name\tMd*\tEpsilonV\tPVar\n')
 
 for experiment_folder in data_folders_for_separate_experiments:

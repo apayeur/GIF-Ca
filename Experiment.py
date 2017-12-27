@@ -4,7 +4,7 @@ import cPickle as pkl
 from SpikeTrainComparator import *
 from SpikingModel import *
 from Trace import *
-
+from scipy.stats import linregress
 
 class Experiment :
     
@@ -194,13 +194,46 @@ class Experiment :
             tr.detectSpikes(self.spikeDetection_threshold, self.spikeDetection_ref)         
         
         print "Done!"
-    
-    
+
+
+    def detectSpikesAllen(self, threshold=20.0):
+
+        print "Detect spikes using Allen's algo!"
+
+        self.spikeDetection_threshold = threshold
+
+        if self.AEC_trace != 0:
+            self.AEC_trace.detectSpikesAllen(self.spikeDetection_threshold)
+
+        for tr in self.trainingset_traces:
+            tr.detectSpikesAllen(self.spikeDetection_threshold)
+
+        for tr in self.testset_traces:
+            tr.detectSpikesAllen(self.spikeDetection_threshold)
+
+        print "Done!"
+
+
     def getTrainingSetNb(self):
         
         return len(self.trainingset_traces) 
       
-
+    def extract_abs_ref_period(self):
+        windows = np.arange(1., 11., 1.)/self.dt
+        windows = windows.astype(int)
+        rval_sq = []
+        #fig, ax = plt.subplots(1, windows.size, figsize=(14, 3))
+        for tr in self.trainingset_traces:
+            V_pre = tr.V[tr.spks]
+            for i, window in enumerate(windows):
+                V_post = tr.V[tr.spks + window]
+                #ax[i].plot(V_pre, V_post, 'o')
+                slope, intercept, r_value, p_value, std_err = linregress(V_pre, V_post)
+                #ax[i].plot(np.linspace(V_pre.min(), V_pre.max(), 2), intercept + slope*np.linspace(V_pre.min(), V_pre.max(), 2))
+                rval_sq.append(r_value**2)
+        #fig.set_tight_layout(True)
+        #plt.show()
+        return windows[np.argmax(rval_sq)]*self.dt
       
     ############################################################################################
     # FUNCTIONS FOR PLOTTING

@@ -31,15 +31,17 @@ def process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True):
     PVar = {}
 
     # List separate experiments in separate folder
-    data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set']
+    data_folders_for_separate_experiments = ['seventh_set', 'ninth_set', 'tenth_set']
+    #data_folders_for_separate_experiments = ['eighth_set']
 
     # For all experiments, extract the cell names
     CellNames = {}
     for experiment_folder in data_folders_for_separate_experiments:
         folder_path = './' + experiment_folder + '/'
         CellNames[experiment_folder] = [name for name in os.listdir(folder_path) if os.path.isdir(folder_path + name) and '_5HT' in name]
-    CellNames['eighth_set'].remove('DRN157_5HT')  # problematic cell
-    CellNames['eighth_set'].remove('DRN164_5HT')  # problematic cell
+    #CellNames['eighth_set'].remove('DRN157_5HT')  # problematic cell
+    #CellNames['eighth_set'].remove('DRN164_5HT')  # problematic cell
+    #CellNames['eighth_set'].remove('DRN094_5HT')  # problematic cell
 
     for experiment_folder in data_folders_for_separate_experiments:
         for cell_name in CellNames[experiment_folder]:
@@ -53,7 +55,7 @@ def process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True):
             #################################################################################################
 
             path_data = './' + experiment_folder + '/' + cell_name + '/'
-            path_results = './Results/' + cell_name + '/'
+            path_results = '../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + cell_name + '/'
 
             # Find extension of data files
             file_names = os.listdir(path_data)
@@ -130,7 +132,9 @@ def process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True):
             iGIF_Ca_NP_fit = iGIF_Ca_NP(experiment.dt)
 
             # Define parameters
-            iGIF_Ca_NP_fit.Tref = 6.0
+            #iGIF_Ca_NP_fit.Tref = 6.0
+            iGIF_Ca_NP_fit.Tref = experiment.extract_abs_ref_period()
+            print 'refractory period = %f' % iGIF_Ca_NP_fit.Tref
             iGIF_Ca_NP_fit.eta = Filter_Rect_LogSpaced()
             iGIF_Ca_NP_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
             iGIF_Ca_NP_fit.gamma = Filter_Rect_LogSpaced()
@@ -224,7 +228,7 @@ def process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True):
             plt.savefig(path_results  + cell_name + '_iGIF_Ca_NP_' + spec_GIF_Ca + 'simulate.png', format='png')
             plt.close()
 
-    output_file = open('./Results/' + 'iGIF_Ca_NP_'+spec_GIF_Ca+'FitPerformance.dat','w')
+    output_file = open('../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + 'iGIF_Ca_NP_'+spec_GIF_Ca+'FitPerformance_FreeTauRef.dat','w')
     output_file.write('#Cell name\tMd*\tEpsilonV\tPVar\n')
 
     for experiment_folder in data_folders_for_separate_experiments:
@@ -234,5 +238,5 @@ def process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True):
 
 
 if __name__ == "__main__":
-    process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True)
+    #process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=True)
     process_all_files_for_iGIF_Ca_NP(is_E_Ca_fixed=False)

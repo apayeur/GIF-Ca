@@ -243,6 +243,7 @@ class SpikeTrainComparator :
         plt.ylabel('PSTH (Hz)')
         plt.tight_layout()
         plt.savefig(fname, format='png')
+        plt.close()
 
         # Compute % of variance explained
         SSE = np.mean( (spks_avg_data_smooth-spks_avg_model_smooth)**2 )

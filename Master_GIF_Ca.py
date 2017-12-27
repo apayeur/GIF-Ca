@@ -31,7 +31,7 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
     PVar = {}
 
     # List separate experiments in separate folder
-    data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set']
+    data_folders_for_separate_experiments = ['seventh_set', 'eighth_set', 'ninth_set', 'tenth_set']
 
     # For all experiments, extract the cell names
     CellNames = {}
@@ -129,7 +129,9 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
             GIF_Ca_fit = GIF_Ca(sampling_time)
 
             # Define parameters and filter characteristics
-            GIF_Ca_fit.Tref = 6.0
+            GIF_Ca_fit.Tref = experiment.extract_abs_ref_period()
+            print 'refractory period = %f' % GIF_Ca_fit.Tref
+            #GIF_Ca_fit.Tref = 6.0
             GIF_Ca_fit.eta = Filter_Rect_LogSpaced()
             GIF_Ca_fit.eta.setMetaParameters(length=2000.0, binsize_lb=0.5, binsize_ub=500.0, slope=10.0)
             GIF_Ca_fit.gamma = Filter_Rect_LogSpaced()
@@ -140,10 +142,10 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
                 tr.setROI([[2000., sampling_time * (len(voltage_trace) - 1) - 2000.]])
 
             # Perform the fit
-            (var_explained_dV, var_explained_V_GIF_Ca_train) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=5.0,
+            (var_explained_dV, var_explained_V_GIF_Ca_train) = GIF_Ca_fit.fit(experiment, DT_beforeSpike=2.0,
                                                                               is_E_Ca_fixed=is_E_Ca_fixed)
             # Save the model
-            GIF_Ca_fit.save(path_results + cell_name + '_GIF_Ca_'+spec_GIF_Ca+'ModelParams' + '.pck')
+            #GIF_Ca_fit.save(path_results + cell_name + '_GIF_Ca_'+spec_GIF_Ca+'ModelParams' + '.pck')
 
             ###################################################################################################
             # EVALUATE MODEL PERFORMANCES ON THE TEST SET DATA
@@ -171,7 +173,7 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
 
             # Compute Md*
             Md_star[cell_name] = prediction.computeMD_Kistler(8.0, GIF_Ca_fit.dt*2.)
-            fname = path_results  + cell_name  + '_GIF_Ca_' + spec_GIF_Ca + 'Raster.png'
+            fname = path_results  + cell_name  + '_GIF_Ca_' + spec_GIF_Ca + 'Raster_test.png'
             kernelForPSTH = 50.0
             PVar[cell_name] = prediction.plotRaster(fname, delta=kernelForPSTH)
 
@@ -179,7 +181,7 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
             #################################################################################################
             #  PLOT TRAINING AND TEST TRACES, MODEL VS EXPERIMENT
             #################################################################################################
-
+            '''
             #Comparison for training and test sets w/o inactivation
             V_training = experiment.trainingset_traces[0].V
             I_training = experiment.trainingset_traces[0].I
@@ -221,7 +223,7 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
             plt.ylabel('Current [nA]')
             plt.title('Training')
             plt.subplot(2,1,2)
-            plt.plot(time/1000, V,'-b', lw=0.5, label='GIF')
+            plt.plot(time/1000, V,'-b', lw=0.5, label='GIF-Ca')
             plt.plot(time/1000, V_training,'black', lw=0.5, label='Data')
             plt.xlim(17,20)
             plt.ylim(-75,0)
@@ -230,8 +232,9 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
             plt.legend(loc='best')
             plt.savefig(path_results  + cell_name + '_GIF_Ca_' + spec_GIF_Ca + 'simulateForcedSpikes_Training.png', format='png')
             plt.close(fig)
+            '''
 
-    output_file = open('./Results/' + 'GIF_Ca_'+spec_GIF_Ca+'FitPerformance.dat','w')
+    output_file = open('../../../Dropbox/Recherches/Raphe/GIF-Ca/Results/' + 'GIF_Ca_'+spec_GIF_Ca+'FitPerformance_test.dat','w')
     output_file.write('#Cell name\tMd*\tEpsilonV\tPVar\n')
 
     for experiment_folder in data_folders_for_separate_experiments:
@@ -241,5 +244,5 @@ def process_all_files_for_GIF_Ca(is_E_Ca_fixed=True):
 
 
 if __name__ == "__main__":
-    process_all_files_for_GIF_Ca(is_E_Ca_fixed=True)
+    #process_all_files_for_GIF_Ca(is_E_Ca_fixed=True)
     process_all_files_for_GIF_Ca(is_E_Ca_fixed=False)

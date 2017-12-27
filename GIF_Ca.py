@@ -6,7 +6,7 @@ from weave import converters
 from numpy.linalg import inv
 
 from SpikingModel import *
-from iGIF import *
+from GIF import *
 
 from Filter_Rect_LogSpaced import *
 
@@ -37,7 +37,7 @@ class GIF_Ca(GIF) :
     def __init__(self, dt=0.1):
         GIF.__init__(self, dt=dt)
 
-        self.E_Ca = 20.0  # mV, reversal potential associated with the voltage-dependent calcium current
+        self.E_Ca = 0.0  # mV, reversal potential associated with the voltage-dependent calcium current
         self.g_Ca = 0.01  # uS, maximal conductance of VDCC
         self.shift = 0. # mV shift in the in/activation curves with respect to some ground truth
 
